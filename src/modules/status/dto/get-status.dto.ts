@@ -1,26 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
+// src/modules/status/dto/status-check.dto.ts
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GetStatusDtoResponse {
-  @ApiProperty({
-    enum: ['ok', 'error'],
-    example: 'ok',
-  })
+  @ApiProperty({ example: 'ok', enum: ['ok', 'error'] })
   status!: 'ok' | 'error';
 
-  @ApiProperty({
-    enum: ['connected', 'disconnected'],
-    example: 'connected',
-  })
+  @ApiProperty({ example: 'connected', enum: ['connected', 'disconnected'] })
   database!: 'connected' | 'disconnected';
 
-  @ApiProperty({
-    example: '2025-12-08T13:22:10.502Z',
-  })
+  @ApiProperty({ example: new Date().toISOString() })
   timestamp!: string;
 
-  @ApiProperty({
-    required: false,
-    example: 'connection timeout',
-  })
+  @ApiPropertyOptional({ example: 'Database connection failed' })
   error?: string;
 }

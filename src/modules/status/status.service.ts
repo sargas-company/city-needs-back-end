@@ -1,15 +1,16 @@
 // src/modules/status/status.service.ts
 import { Injectable } from '@nestjs/common';
 
+import { GetStatusDtoResponse } from './dto/get-status.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class StatusService {
   constructor(private prisma: PrismaService) {}
 
-  async check() {
+  async check(): Promise<GetStatusDtoResponse> {
     try {
-      // await this.prisma.$queryRaw`SELECT 1`;
+      await this.prisma.$queryRaw`SELECT 1`;
 
       return {
         status: 'ok',

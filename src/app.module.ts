@@ -1,18 +1,15 @@
-// import { ImageModule } from './modules/images/image.module';
 // import { QueueModule } from './modules/queue/queue.module';
-// import { StripeModule } from './modules/stripe/stripe.module';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import basicAuth from 'express-basic-auth';
 
-import { ClerkAuthGuard } from './common/guards/clerk-auth.guard';
-import { clerkClientProviders } from './common/providers/clerk-client.providers';
 import { LogRetentionService } from './common/services/logger/log-retention.service';
+import { FirebaseModule } from './firebase/firebase.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { StatusModule } from './modules/status/status.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -38,14 +35,9 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     UsersModule,
     StatusModule,
+    FirebaseModule,
+    AuthModule,
   ],
-  providers: [
-    ...clerkClientProviders,
-    LogRetentionService,
-    {
-      provide: APP_GUARD,
-      useClass: ClerkAuthGuard,
-    },
-  ],
+  providers: [LogRetentionService],
 })
 export class AppModule {}

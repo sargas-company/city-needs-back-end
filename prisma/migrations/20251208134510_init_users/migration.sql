@@ -2,7 +2,7 @@
 CREATE TYPE "UserRole" AS ENUM ('END_USER', 'BUSINESS_OWNER', 'ADMIN');
 
 -- CreateEnum
-CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'PENDING', 'SUSPENDED', 'DELETED');
+CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -12,7 +12,7 @@ CREATE TABLE "users" (
     "phone" TEXT,
     "username" TEXT,
     "avatar" TEXT,
-    "role" "UserRole" NOT NULL DEFAULT 'END_USER',
+    "role" "UserRole",
     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
