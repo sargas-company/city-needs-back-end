@@ -52,6 +52,12 @@ export class UserDto {
   })
   status!: UserStatus;
 
+  @ApiProperty({ default: false })
+  emailVerified!: boolean;
+
+  @ApiProperty({ nullable: true, type: String, format: 'date-time' })
+  lastVerificationEmailSentAt!: Date | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',

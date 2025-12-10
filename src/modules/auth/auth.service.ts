@@ -32,9 +32,9 @@ export class AuthService {
     }
 
     const email = firebaseUser.email ?? null;
-    const phone = (firebaseUser as any).phone_number ?? null;
     const firebaseName = (firebaseUser as any).name ?? null;
     const firebaseAvatar = (firebaseUser as any).picture ?? null;
+    const emailVerifiedFromFirebase = !!firebaseUser.email_verified;
 
     const existing = await this.prisma.user.findUnique({
       where: { authExternalId: uid },
@@ -49,11 +49,12 @@ export class AuthService {
       const data: Prisma.UserCreateInput = {
         authExternalId: uid,
         email,
-        phone,
+        phone: payload.phone ?? null,
         username: payload.username ?? firebaseName,
         avatar: payload.avatar ?? firebaseAvatar,
         status: UserStatus.ACTIVE,
         role: requestedRole ?? UserRole.END_USER,
+        emailVerified: emailVerifiedFromFirebase,
       };
 
       return this.prisma.user.create({ data });
@@ -83,6 +84,14 @@ export class AuthService {
 
     if (existing.role === null && requestedRole) {
       updateData.role = requestedRole;
+    }
+
+    if (existing.phone === null && payload.phone !== undefined) {
+      updateData.phone = payload.phone;
+    }
+
+    if (emailVerifiedFromFirebase && !existing.emailVerified) {
+      updateData.emailVerified = true;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -121,6 +130,8 @@ export class AuthService {
       avatar: user.avatar,
       role: user.role,
       status: user.status,
+      emailVerified: user.emailVerified,
+      lastVerificationEmailSentAt: user.lastVerificationEmailSentAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

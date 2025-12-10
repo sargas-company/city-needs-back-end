@@ -27,6 +27,8 @@ model User {
   avatar         String?
   role           UserRole?
   status         UserStatus  @default(ACTIVE)
+  emailVerified               Boolean   @default(false)
+  lastVerificationEmailSentAt DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

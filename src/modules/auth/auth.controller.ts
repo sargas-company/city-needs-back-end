@@ -1,5 +1,5 @@
 // src/modules/auth/auth.controller.ts
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Headers, UseGuards } from '@nestjs/common';
 import { User } from '@prisma/client';
 import * as admin from 'firebase-admin';
 import { CurrentFirebaseUser } from 'src/common/decorators/current-firebase-user.decorator';
@@ -11,10 +11,14 @@ import { successResponse } from 'src/common/utils/response.util';
 import { AuthService } from './auth.service';
 import { SwaggerAuthMe, SwaggerAuthSync } from './auth.swagger';
 import { AuthSyncRequestDto } from './dto/auth-sync-request.dto';
+import { EmailVerificationService } from './email-verification.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailVerificationService: EmailVerificationService,
+  ) {}
 
   @Post('sync')
   @UseGuards(FirebaseAuthGuard)
@@ -41,6 +45,23 @@ export class AuthController {
     return successResponse({
       data: dto,
       message: 'Current user info',
+    });
+  }
+
+  @Post('send-verification-email')
+  @UseGuards(DbUserAuthGuard)
+  async sendEmailVerification(
+    @CurrentUser() user: User,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    const authHeader = authorization ?? '';
+    const [, idToken] = authHeader.split(' ');
+
+    await this.emailVerificationService.sendVerificationEmail(user.id, idToken);
+
+    return successResponse({
+      data: null,
+      message: 'Verification email sent',
     });
   }
 }
