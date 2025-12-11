@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { Prisma, User, UserRole, UserStatus } from '@prisma/client';
 import * as admin from 'firebase-admin';
@@ -14,6 +15,7 @@ import { UserDto } from './dto/user.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -25,9 +27,11 @@ export class AuthService {
     firebaseUser: admin.auth.DecodedIdToken,
     payload: AuthSyncRequestDto,
   ): Promise<User> {
+    this.logger.debug(`Sync user started`, AuthService.name);
     const uid = firebaseUser.uid;
 
     if (!uid) {
+      this.logger.warn('Firebase uid is missing', AuthService.name);
       throw new BadRequestException('Firebase uid is missing');
     }
 
@@ -42,10 +46,12 @@ export class AuthService {
 
     const requestedRole = payload.role ?? null;
     if (requestedRole === UserRole.ADMIN) {
+      this.logger.warn('Attempt to set ADMIN role via auth sync', AuthService.name);
       throw new BadRequestException('Cannot set ADMIN role via auth sync');
     }
 
     if (!existing) {
+      this.logger.log(`Creating new user from Firebase uid=${uid}`, AuthService.name);
       const data: Prisma.UserCreateInput = {
         authExternalId: uid,
         email,
@@ -57,14 +63,27 @@ export class AuthService {
         emailVerified: emailVerifiedFromFirebase,
       };
 
-      return this.prisma.user.create({ data });
+      const user = await this.prisma.user.create({ data });
+      this.logger.log(
+        `User created: id=${user.id}, uid=${uid}, role=${user.role}, emailVerified=${user.emailVerified}`,
+        AuthService.name,
+      );
+      return user;
     }
 
     if (existing.status === UserStatus.SUSPENDED) {
+      this.logger.warn(
+        `Suspended user tried to sync: id=${existing.id}, uid=${uid}`,
+        AuthService.name,
+      );
       throw new ForbiddenException('User is suspended');
     }
 
     if (existing.status === UserStatus.DELETED) {
+      this.logger.warn(
+        `Deleted user tried to sync: id=${existing.id}, uid=${uid}`,
+        AuthService.name,
+      );
       throw new ForbiddenException('User is deleted');
     }
 
@@ -94,14 +113,26 @@ export class AuthService {
       updateData.emailVerified = true;
     }
 
-    if (Object.keys(updateData).length === 0) {
+    const updatedFields = Object.keys(updateData);
+
+    if (updatedFields.length === 0) {
+      this.logger.debug(`User sync no-op: id=${existing.id}, uid=${uid}`, AuthService.name);
       return existing;
     }
 
-    return this.prisma.user.update({
+    this.logger.debug(
+      `Updating user: id=${existing.id}, uid=${uid}, fields=[${updatedFields.join(', ')}]`,
+      AuthService.name,
+    );
+
+    const updated = await this.prisma.user.update({
       where: { id: existing.id },
       data: updateData,
     });
+
+    this.logger.debug(`User updated successfully: id=${updated.id}, uid=${uid}`, AuthService.name);
+
+    return updated;
   }
 
   async getUserByFirebaseUid(firebaseUser: admin.auth.DecodedIdToken): Promise<User> {
@@ -115,6 +146,7 @@ export class AuthService {
     });
 
     if (!user) {
+      this.logger.warn(`Not synced user tried to get me: uid=${uid}`, AuthService.name);
       throw new NotFoundException('User is not synced');
     }
 

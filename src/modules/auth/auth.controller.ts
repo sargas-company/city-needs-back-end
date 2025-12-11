@@ -11,13 +11,16 @@ import { successResponse } from 'src/common/utils/response.util';
 import { AuthService } from './auth.service';
 import { SwaggerAuthMe, SwaggerAuthSync } from './auth.swagger';
 import { AuthSyncRequestDto } from './dto/auth-sync-request.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { EmailVerificationService } from './email-verification.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly passwordResetService: PasswordResetService,
   ) {}
 
   @Post('sync')
@@ -62,6 +65,16 @@ export class AuthController {
     return successResponse({
       data: null,
       message: 'Verification email sent',
+    });
+  }
+
+  @Post('reset-password-request')
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    await this.passwordResetService.requestPasswordReset(dto.email);
+
+    return successResponse({
+      data: null,
+      message: 'If this email exists, a password reset link has been sent',
     });
   }
 }

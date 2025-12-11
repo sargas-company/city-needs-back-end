@@ -19,7 +19,13 @@ export class AppLogger implements LoggerService {
       fs.mkdirSync(logDir, { recursive: true });
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const prettyLogLevel: pino.LevelWithSilent = isProd ? 'info' : 'debug';
+
     this.prettyTransport = pino(
+      {
+        level: prettyLogLevel,
+      },
       pino.transport({
         target: 'pino-pretty',
         options: {

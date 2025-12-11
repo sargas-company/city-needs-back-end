@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -13,6 +14,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class EmailVerificationService {
+  private readonly logger = new Logger(EmailVerificationService.name);
+
   constructor(
     private readonly http: HttpService,
     private readonly prisma: PrismaService,
@@ -20,7 +23,12 @@ export class EmailVerificationService {
   ) {}
 
   private getCooldownSeconds(): number {
-    return Number(this.configService.get('EMAIL_VERIFICATION_COOLDOWN_SECONDS') ?? 600);
+    const value = this.configService.get('EMAIL_VERIFICATION_COOLDOWN_SECONDS');
+    const cooldown = Number(value ?? 600);
+
+    this.logger.debug(`Using email verification cooldown: ${cooldown} seconds (raw="${value}")`);
+
+    return cooldown;
   }
 
   private getFirebaseApiKey(): string {
@@ -31,15 +39,12 @@ export class EmailVerificationService {
     return key;
   }
 
-  private getContinueUrl(): string {
-    const url = this.configService.get<string>('FRONTEND_EMAIL_VERIFIED_URL');
-    if (!url) {
-      throw new BadRequestException('FRONTEND_EMAIL_VERIFIED_URL is not configured');
-    }
-    return url;
-  }
-
   async sendVerificationEmail(userId: string, idToken: string): Promise<void> {
+    this.logger.debug(
+      `sendVerificationEmail called for userId=${userId}`,
+      EmailVerificationService.name,
+    );
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -68,15 +73,18 @@ export class EmailVerificationService {
     }
 
     const firebaseApiKey = this.getFirebaseApiKey();
-    const continueUrl = this.getContinueUrl();
 
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseApiKey}`;
 
     const payload = {
       requestType: 'VERIFY_EMAIL',
       idToken,
-      continueUrl,
     };
+
+    this.logger.debug(
+      `Sending verification email via Firebase for userId=${userId}`,
+      EmailVerificationService.name,
+    );
 
     try {
       await firstValueFrom(this.http.post(url, payload));
@@ -87,6 +95,11 @@ export class EmailVerificationService {
           lastVerificationEmailSentAt: new Date(),
         },
       });
+
+      this.logger.log(
+        `Verification email sent and timestamp updated for userId=${userId}`,
+        EmailVerificationService.name,
+      );
     } catch {
       throw new BadRequestException('Failed to send verification email');
     }
