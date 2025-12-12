@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('END_USER', 'BUSINESS_OWNER', 'ADMIN');
 
@@ -38,7 +40,7 @@ CREATE TABLE "businesses" (
     "description" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "addressId" TEXT NOT NULL,
+    "addressId" TEXT,
     "logo" TEXT,
     "status" "BusinessStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -139,7 +141,7 @@ ALTER TABLE "users" ADD CONSTRAINT "users_addressId_fkey" FOREIGN KEY ("addressI
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "businesses" ADD CONSTRAINT "businesses_addressId_fkey" FOREIGN KEY ("addressId") REFERENCES "addresses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "businesses" ADD CONSTRAINT "businesses_addressId_fkey" FOREIGN KEY ("addressId") REFERENCES "addresses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_logo_fkey" FOREIGN KEY ("logo") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -158,3 +160,42 @@ ALTER TABLE "business_categories" ADD CONSTRAINT "business_categories_categoryId
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+INSERT INTO "categories" ("id", "title", "slug", "description")
+VALUES
+  (
+    gen_random_uuid(),
+    'Beauty & Wellness',
+    'beauty-wellness',
+    'Beauty, wellness, health, and self-care services'
+  ),
+  (
+    gen_random_uuid(),
+    'Cleaning',
+    'cleaning',
+    'Home and commercial cleaning services'
+  ),
+  (
+    gen_random_uuid(),
+    'Pet Care',
+    'pet-care',
+    'Pet sitting, grooming, walking, and care services'
+  ),
+  (
+    gen_random_uuid(),
+    'Home Repairs',
+    'home-repairs',
+    'Maintenance, renovation, and repair services'
+  ),
+  (
+    gen_random_uuid(),
+    'Delivery & Assistance',
+    'delivery-assistance',
+    'Delivery, errands, and personal assistance services'
+  ),
+  (
+    gen_random_uuid(),
+    'Other',
+    'other',
+    'Other services that do not fit into main categories'
+  );

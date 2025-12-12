@@ -58,6 +58,9 @@ export class UserDto {
   @ApiProperty({ nullable: true, type: String, format: 'date-time' })
   lastVerificationEmailSentAt!: Date | null;
 
+  @ApiProperty({ nullable: true, type: Number })
+  onboardingStep!: number | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',

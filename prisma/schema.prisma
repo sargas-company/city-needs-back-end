@@ -68,8 +68,8 @@ model Business {
   description String
   phone       String
   email       String
-  addressId   String @unique
-  address     Address        @relation("BusinessAddress", fields: [addressId], references: [id])
+  addressId   String?        @unique
+  address     Address?       @relation("BusinessAddress", fields: [addressId], references: [id])
   logoId      String?        @map("logo") @unique
   logo        File?          @relation("BusinessLogo", fields: [logoId], references: [id])
   status      BusinessStatus @default(PENDING)

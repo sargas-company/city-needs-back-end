@@ -10,6 +10,7 @@ import basicAuth from 'express-basic-auth';
 import { LogRetentionService } from './common/services/logger/log-retention.service';
 import { FirebaseModule } from './firebase/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { StatusModule } from './modules/status/status.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -37,6 +38,7 @@ import { PrismaModule } from './prisma/prisma.module';
     StatusModule,
     FirebaseModule,
     AuthModule,
+    OnboardingModule,
   ],
   providers: [LogRetentionService],
 })

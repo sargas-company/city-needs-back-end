@@ -21,7 +21,8 @@ export class AuthService {
   /**
    * Sync user from Firebase:
    * - if not exists -> create
-   * - if exists -> update soft fields (username, avatar), role only if null
+   * - if exists -> update soft fields (username, phone, emailVerified),
+   *   role only if null; if role was null and becomes non-null -> onboardingStep = 1 (if null)
    */
   async syncUser(
     firebaseUser: admin.auth.DecodedIdToken,
@@ -95,6 +96,10 @@ export class AuthService {
 
     if (existing.role === null && requestedRole) {
       updateData.role = requestedRole;
+
+      if (existing.onboardingStep === null) {
+        updateData.onboardingStep = 1;
+      }
     }
 
     if (existing.phone === null && payload.phone !== undefined) {
@@ -156,6 +161,7 @@ export class AuthService {
       status: user.status,
       emailVerified: user.emailVerified,
       lastVerificationEmailSentAt: user.lastVerificationEmailSentAt,
+      onboardingStep: user.onboardingStep,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
