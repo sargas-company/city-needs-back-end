@@ -6,6 +6,8 @@ datasource db {
   provider = "postgresql"
 }
 
+// ENUMS
+
 enum UserRole {
   END_USER
   BUSINESS_OWNER
@@ -18,19 +20,118 @@ enum UserStatus {
   DELETED
 }
 
+enum BusinessStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum FileType {
+  AVATAR
+  BUSINESS_LOGO
+  BUSINESS_PHOTO
+  BUSINESS_DOCUMENT
+  OTHER
+}
+
+// MODELS
+
 model User {
   id             String      @id @default(uuid())
   authExternalId String      @unique
   email          String?     @unique
   phone          String?     @unique
   username       String?
-  avatar         String?
+  avatarId       String?     @map("avatar") @unique
+  avatar         File?       @relation("UserAvatar", fields: [avatarId], references: [id])
   role           UserRole?
   status         UserStatus  @default(ACTIVE)
   emailVerified               Boolean   @default(false)
   lastVerificationEmailSentAt DateTime?
+  onboardingStep Int?
+  addressId String? @unique
+  address   Address? @relation("UserAddress", fields: [addressId], references: [id])
+  business  Business? @relation("UserBusiness")
+  categories UserCategory[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   @@map("users")
+}
+
+model Business {
+  id          String         @id @default(uuid())
+  ownerUserId String         @unique
+  owner       User           @relation("UserBusiness", fields: [ownerUserId], references: [id])
+  name        String
+  description String
+  phone       String
+  email       String
+  addressId   String @unique
+  address     Address        @relation("BusinessAddress", fields: [addressId], references: [id])
+  logoId      String?        @map("logo") @unique
+  logo        File?          @relation("BusinessLogo", fields: [logoId], references: [id])
+  status      BusinessStatus @default(PENDING)
+  categories  BusinessCategory[]
+  files       File[]         @relation("BusinessFiles")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("businesses")
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  countryCode  String 
+  city         String
+  state        String
+  addressLine1 String
+  addressLine2 String?
+  zip          String?
+  user     User?     @relation("UserAddress")
+  business Business? @relation("BusinessAddress")
+  @@map("addresses")
+}
+
+model Category {
+  id          String  @id @default(uuid())
+  title       String  @unique
+  slug        String  @unique
+  description String?
+  userCategories     UserCategory[]
+  businessCategories BusinessCategory[]
+  @@map("categories")
+}
+
+model UserCategory {
+  userId     String
+  categoryId String
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+  @@id([userId, categoryId])
+  @@map("user_categories")
+}
+
+model BusinessCategory {
+  businessId String
+  categoryId String
+  business Business @relation(fields: [businessId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+  @@id([businessId, categoryId])
+  @@map("business_categories")
+}
+
+model File {
+  id           String   @id @default(uuid())
+  url          String
+  type         FileType
+  mimeType     String?
+  sizeBytes    Int?
+  originalName String?
+  businessId String?
+  business   Business? @relation("BusinessFiles", fields: [businessId], references: [id])
+  logoBusiness Business? @relation("BusinessLogo")
+  userAvatar   User?     @relation("UserAvatar")
+  @@map("files")
 }

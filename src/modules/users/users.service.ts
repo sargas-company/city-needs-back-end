@@ -22,7 +22,7 @@ export class UsersService {
     username?: string | null;
     avatar?: string | null;
   }): Promise<User> {
-    const { authExternalId, email, phone, username, avatar } = payload;
+    const { authExternalId, email, phone, username } = payload;
 
     return this.prisma.user.upsert({
       where: { authExternalId },
@@ -31,13 +31,13 @@ export class UsersService {
         email: email ?? null,
         phone: phone ?? null,
         username: username ?? null,
-        avatar: avatar ?? null,
+        // avatar: avatar ?? null,
       },
       update: {
         email: email ?? undefined,
         phone: phone ?? undefined,
         username: username ?? undefined,
-        avatar: avatar ?? undefined,
+        // avatar: avatar ?? undefined,
       },
     });
   }

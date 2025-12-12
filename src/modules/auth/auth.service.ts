@@ -37,7 +37,6 @@ export class AuthService {
 
     const email = firebaseUser.email ?? null;
     const firebaseName = (firebaseUser as any).name ?? null;
-    const firebaseAvatar = (firebaseUser as any).picture ?? null;
     const emailVerifiedFromFirebase = !!firebaseUser.email_verified;
 
     const existing = await this.prisma.user.findUnique({
@@ -57,10 +56,9 @@ export class AuthService {
         email,
         phone: payload.phone ?? null,
         username: payload.username ?? firebaseName,
-        avatar: payload.avatar ?? firebaseAvatar,
         status: UserStatus.ACTIVE,
-        role: requestedRole ?? UserRole.END_USER,
         emailVerified: emailVerifiedFromFirebase,
+        ...(requestedRole ? { role: requestedRole } : {}),
       };
 
       const user = await this.prisma.user.create({ data });
@@ -93,12 +91,6 @@ export class AuthService {
       updateData.username = payload.username;
     } else if (!existing.username && firebaseName) {
       updateData.username = firebaseName;
-    }
-
-    if (payload.avatar !== undefined) {
-      updateData.avatar = payload.avatar;
-    } else if (!existing.avatar && firebaseAvatar) {
-      updateData.avatar = firebaseAvatar;
     }
 
     if (existing.role === null && requestedRole) {
@@ -159,7 +151,7 @@ export class AuthService {
       email: user.email,
       phone: user.phone,
       username: user.username,
-      avatar: user.avatar,
+      avatar: user.avatarId,
       role: user.role,
       status: user.status,
       emailVerified: user.emailVerified,
