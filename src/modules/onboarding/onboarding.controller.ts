@@ -1,5 +1,4 @@
-import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -9,19 +8,21 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { User } from '@prisma/client';
-import { memoryStorage } from 'multer';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 
 import { OnboardingSubmitDto } from './dto/onboarding-submit.dto';
 import {
+  AddressPayloadDto,
+  CategoriesPayloadDto,
+  BusinessProfilePayloadDto,
   BusinessAddressRequestDto,
+  BusinessFilesRequestDto,
   BusinessFilesSkipRequestDto,
   BusinessProfileRequestDto,
   CustomerAddressRequestDto,
   CustomerCategoriesRequestDto,
-  BusinessFilesMultipartRequestDto,
 } from './dto/onboarding-sumit-swagger.dto';
 import { OnboardingService } from './onboarding.service';
 
@@ -32,8 +33,11 @@ import { OnboardingService } from './onboarding.service';
   CustomerCategoriesRequestDto,
   BusinessProfileRequestDto,
   BusinessAddressRequestDto,
+  BusinessFilesRequestDto,
   BusinessFilesSkipRequestDto,
-  BusinessFilesMultipartRequestDto,
+  AddressPayloadDto,
+  CategoriesPayloadDto,
+  BusinessProfilePayloadDto,
 )
 @Controller('onboarding')
 export class OnboardingController {
@@ -41,7 +45,7 @@ export class OnboardingController {
 
   @Post('submit')
   @UseGuards(DbUserAuthGuard)
-  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiConsumes('application/json')
   @ApiBody({
     description:
       'Submit onboarding step.\n\n' +
@@ -51,8 +55,9 @@ export class OnboardingController {
       '**BUSINESS_OWNER flow**:\n' +
       '- BUSINESS_PROFILE\n' +
       '- BUSINESS_ADDRESS\n' +
-      '- BUSINESS_FILES or BUSINESS_FILES_SKIP\n\n' +
-      'BUSINESS_FILES must be sent as multipart/form-data with file fields.',
+      '- BUSINESS_FILES (commit upload session)\n' +
+      '- BUSINESS_FILES_SKIP (abort upload session)\n\n' +
+      'For BUSINESS_FILES you must upload files first via /onboarding/upload-session.',
     schema: {
       discriminator: { propertyName: 'action' },
       oneOf: [
@@ -60,38 +65,13 @@ export class OnboardingController {
         { $ref: getSchemaPath(CustomerCategoriesRequestDto) },
         { $ref: getSchemaPath(BusinessProfileRequestDto) },
         { $ref: getSchemaPath(BusinessAddressRequestDto) },
+        { $ref: getSchemaPath(BusinessFilesRequestDto) },
         { $ref: getSchemaPath(BusinessFilesSkipRequestDto) },
-        { $ref: getSchemaPath(BusinessFilesMultipartRequestDto) },
       ],
     },
   })
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'logo', maxCount: 1 },
-        { name: 'photos', maxCount: 6 },
-        { name: 'documents', maxCount: 6 },
-      ],
-      {
-        storage: memoryStorage(),
-        limits: {
-          fileSize: 15 * 1024 * 1024,
-          files: 13,
-        },
-      },
-    ),
-  )
-  async submit(
-    @CurrentUser() user: User,
-    @Body() dto: OnboardingSubmitDto,
-    @UploadedFiles()
-    files?: {
-      logo?: Express.Multer.File[];
-      photos?: Express.Multer.File[];
-      documents?: Express.Multer.File[];
-    },
-  ) {
-    const result = await this.onboardingService.submit(user, dto, files);
+  async submit(@CurrentUser() user: User, @Body() dto: OnboardingSubmitDto) {
+    const result = await this.onboardingService.submit(user, dto);
     return successResponse(result, 201);
   }
 }

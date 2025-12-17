@@ -17,6 +17,7 @@ import {
   OnboardingSubmitDto,
 } from './dto/onboarding-submit.dto';
 import { OnboardingAction, OnboardingStatus } from './types/onboarding.types';
+import { UploadSessionsService } from '../upload-sessions/upload-sessions.service';
 
 type LoadedUser = Prisma.UserGetPayload<{
   include: {
@@ -28,17 +29,12 @@ type LoadedUser = Prisma.UserGetPayload<{
 export class OnboardingService {
   private readonly logger = new Logger(OnboardingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadSessions: UploadSessionsService,
+  ) {}
 
-  async submit(
-    dbUser: User,
-    dto: OnboardingSubmitDto,
-    files?: {
-      logo?: Express.Multer.File[];
-      photos?: Express.Multer.File[];
-      documents?: Express.Multer.File[];
-    },
-  ) {
+  async submit(dbUser: User, dto: OnboardingSubmitDto) {
     const uid = dbUser.authExternalId;
     if (!uid) throw new BadRequestException('Firebase uid is missing');
 
@@ -48,53 +44,46 @@ export class OnboardingService {
     if (user.status === UserStatus.DELETED) throw new ForbiddenException('User is deleted');
 
     if (user.role === null) {
-      throw new ConflictException({
-        errorCode: 'ROLE_NOT_SELECTED',
-        message: 'User role is not selected. Call /auth/sync with role first.',
-      });
+      throw new ConflictException('User role is not selected. Call /auth/sync with role first.');
     }
 
     const payload = this.normalizePayload(dto.payload);
     const status = this.computeStatus(user);
 
     if (!status.allowedActions.includes(dto.action)) {
-      throw new ConflictException({
-        errorCode: 'INVALID_ONBOARDING_ACTION',
-        message: `Action ${dto.action} is not allowed in current onboarding state`,
-        onboarding: status,
-      });
+      throw new ConflictException(
+        `Action ${dto.action} is not allowed in current onboarding state. Current action: ${status.allowedActions[0]}`,
+      );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      switch (dto.action) {
-        case OnboardingAction.CUSTOMER_ADDRESS:
-          await this.handleCustomerAddress(tx, user, payload);
-          return;
+    if (dto.action === OnboardingAction.BUSINESS_FILES) {
+      await this.handleBusinessFiles(dbUser);
+    } else if (dto.action === OnboardingAction.BUSINESS_FILES_SKIP) {
+      await this.handleBusinessFilesSkip(dbUser);
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        switch (dto.action) {
+          case OnboardingAction.CUSTOMER_ADDRESS:
+            await this.handleCustomerAddress(tx, user, payload);
+            return;
 
-        case OnboardingAction.CUSTOMER_CATEGORIES:
-          await this.handleCustomerCategories(tx, user, payload);
-          return;
+          case OnboardingAction.CUSTOMER_CATEGORIES:
+            await this.handleCustomerCategories(tx, user, payload);
+            return;
 
-        case OnboardingAction.BUSINESS_PROFILE:
-          await this.handleBusinessProfile(tx, user, payload);
-          return;
+          case OnboardingAction.BUSINESS_PROFILE:
+            await this.handleBusinessProfile(tx, user, payload);
+            return;
 
-        case OnboardingAction.BUSINESS_ADDRESS:
-          await this.handleBusinessAddress(tx, user, payload);
-          return;
+          case OnboardingAction.BUSINESS_ADDRESS:
+            await this.handleBusinessAddress(tx, user, payload);
+            return;
 
-        case OnboardingAction.BUSINESS_FILES:
-          await this.handleBusinessFiles(tx, user, files);
-          return;
-
-        case OnboardingAction.BUSINESS_FILES_SKIP:
-          await this.handleBusinessFilesSkip(tx, user);
-          return;
-
-        default:
-          throw new BadRequestException('Unknown onboarding action');
-      }
-    });
+          default:
+            throw new BadRequestException('Unknown onboarding action');
+        }
+      });
+    }
 
     const reloaded = await this.loadUser(uid);
     const nextStatus = this.computeStatus(reloaded);
@@ -405,90 +394,22 @@ export class OnboardingService {
     });
   }
 
-  private async handleBusinessFiles(
-    tx: Prisma.TransactionClient,
-    user: LoadedUser,
-    files?: {
-      logo?: Express.Multer.File[];
-      photos?: Express.Multer.File[];
-      documents?: Express.Multer.File[];
-    },
-  ) {
-    const business = await tx.business.findUnique({ where: { ownerUserId: user.id } });
-    if (!business) throw new ConflictException('Business must exist to upload files');
+  private async handleBusinessFiles(user: User) {
+    await this.uploadSessions.commitDraftForOnboarding(user);
 
-    const info = this.validateUploadedFiles(files);
-
-    this.logger.log(
-      `Business files validated (not saved yet): businessId=${business.id}, logo=${info.hasLogo}, photos=${info.photosCount}, documents=${info.documentsCount}`,
-    );
-
-    await tx.user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { onboardingStep: null },
     });
   }
 
-  private async handleBusinessFilesSkip(tx: Prisma.TransactionClient, user: LoadedUser) {
-    await tx.user.update({
+  private async handleBusinessFilesSkip(user: User) {
+    await this.uploadSessions.abortDraft(user);
+
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { onboardingStep: null },
     });
-  }
-
-  // Files validation (no storage yet)
-
-  private validateUploadedFiles(files?: {
-    logo?: Express.Multer.File[];
-    photos?: Express.Multer.File[];
-    documents?: Express.Multer.File[];
-  }) {
-    const logo = files?.logo?.[0];
-    const photos = files?.photos ?? [];
-    const documents = files?.documents ?? [];
-
-    const allowedImage = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    const allowedDoc = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
-
-    const bytes = (mb: number) => mb * 1024 * 1024;
-
-    const errors: string[] = [];
-
-    if (files?.logo && files.logo.length > 1) errors.push('logo: only one file allowed');
-    if (logo) {
-      if (!allowedImage.has(logo.mimetype)) errors.push(`logo: invalid mimetype ${logo.mimetype}`);
-      if (logo.size > bytes(5)) errors.push('logo: max size is 5MB');
-    }
-
-    if (photos.length > 6) errors.push('photos: max 6 files allowed');
-    for (const p of photos) {
-      if (!allowedImage.has(p.mimetype)) errors.push(`photos: invalid mimetype ${p.mimetype}`);
-      if (p.size > bytes(10)) errors.push('photos: max size is 10MB per file');
-    }
-
-    if (documents.length > 6) errors.push('documents: max 6 files allowed');
-    for (const d of documents) {
-      if (!allowedDoc.has(d.mimetype)) errors.push(`documents: invalid mimetype ${d.mimetype}`);
-      if (d.size > bytes(15)) errors.push('documents: max size is 15MB per file');
-    }
-
-    if (!logo && photos.length === 0 && documents.length === 0) {
-      errors.push('No files provided');
-    }
-
-    if (errors.length) {
-      throw new BadRequestException({
-        errorCode: 'FILES_VALIDATION_ERROR',
-        message: 'Invalid files',
-        details: errors,
-      });
-    }
-
-    return {
-      hasLogo: !!logo,
-      photosCount: photos.length,
-      documentsCount: documents.length,
-    };
   }
 
   // Helpers

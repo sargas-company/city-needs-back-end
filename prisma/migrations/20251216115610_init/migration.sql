@@ -12,6 +12,12 @@ CREATE TYPE "BusinessStatus" AS ENUM ('PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTE
 -- CreateEnum
 CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'OTHER');
 
+-- CreateEnum
+CREATE TYPE "UploadSessionStatus" AS ENUM ('DRAFT', 'COMMITTED', 'ABORTED', 'EXPIRED');
+
+-- CreateEnum
+CREATE TYPE "UploadItemKind" AS ENUM ('LOGO', 'PHOTO', 'DOCUMENT');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -92,6 +98,7 @@ CREATE TABLE "business_categories" (
 CREATE TABLE "files" (
     "id" TEXT NOT NULL,
     "url" TEXT NOT NULL,
+    "storageKey" TEXT,
     "type" "FileType" NOT NULL,
     "mimeType" TEXT,
     "sizeBytes" INTEGER,
@@ -99,6 +106,28 @@ CREATE TABLE "files" (
     "businessId" TEXT,
 
     CONSTRAINT "files_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "upload_sessions" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "status" "UploadSessionStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "upload_sessions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "upload_session_items" (
+    "id" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "fileId" TEXT NOT NULL,
+    "kind" "UploadItemKind" NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "upload_session_items_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -131,6 +160,21 @@ CREATE UNIQUE INDEX "categories_title_key" ON "categories"("title");
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "files_storageKey_key" ON "files"("storageKey");
+
+-- CreateIndex
+CREATE INDEX "upload_sessions_businessId_status_idx" ON "upload_sessions"("businessId", "status");
+
+-- CreateIndex
+CREATE INDEX "upload_session_items_sessionId_kind_idx" ON "upload_session_items"("sessionId", "kind");
+
+-- CreateIndex
+CREATE INDEX "upload_session_items_fileId_idx" ON "upload_session_items"("fileId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "upload_session_items_sessionId_fileId_key" ON "upload_session_items"("sessionId", "fileId");
+
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_avatar_fkey" FOREIGN KEY ("avatar") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -160,6 +204,19 @@ ALTER TABLE "business_categories" ADD CONSTRAINT "business_categories_categoryId
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "upload_sessions" ADD CONSTRAINT "upload_sessions_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "upload_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE UNIQUE INDEX "upload_sessions_one_draft_per_business"
+ON "upload_sessions" ("businessId")
+WHERE "status" = 'DRAFT';
 
 INSERT INTO "categories" ("id", "title", "slug", "description")
 VALUES

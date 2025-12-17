@@ -84,19 +84,7 @@ export class BusinessAddressRequestDto {
   payload!: AddressPayloadDto;
 }
 
-export class BusinessFilesSkipRequestDto {
-  @ApiProperty({ enum: OnboardingAction, example: OnboardingAction.BUSINESS_FILES_SKIP })
-  action!: OnboardingAction.BUSINESS_FILES_SKIP;
-
-  @ApiPropertyOptional({ default: {} })
-  payload?: Record<string, never>;
-}
-
-// --------------------
-// MULTIPART DTO
-// --------------------
-
-export class BusinessFilesMultipartRequestDto {
+export class BusinessFilesRequestDto {
   @ApiProperty({ enum: OnboardingAction, example: OnboardingAction.BUSINESS_FILES })
   action!: OnboardingAction.BUSINESS_FILES;
 
@@ -104,32 +92,16 @@ export class BusinessFilesMultipartRequestDto {
     description: 'Optional JSON string, usually empty',
     example: '{}',
   })
-  payload?: string;
+  payload?: Record<string, never>;
+}
+
+export class BusinessFilesSkipRequestDto {
+  @ApiProperty({ enum: OnboardingAction, example: OnboardingAction.BUSINESS_FILES_SKIP })
+  action!: OnboardingAction.BUSINESS_FILES_SKIP;
 
   @ApiPropertyOptional({
-    type: 'string',
-    format: 'binary',
-    description: 'Business logo (max 1)',
+    description: 'Optional JSON string, usually empty',
+    example: '{}',
   })
-  logo?: any;
-
-  @ApiPropertyOptional({
-    type: 'array',
-    description: 'Business photos (max 6)',
-    items: {
-      type: 'string',
-      format: 'binary',
-    },
-  })
-  photos?: any[];
-
-  @ApiPropertyOptional({
-    type: 'array',
-    description: 'Business documents (max 6)',
-    items: {
-      type: 'string',
-      format: 'binary',
-    },
-  })
-  documents?: any[];
+  payload?: Record<string, never>;
 }

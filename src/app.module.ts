@@ -12,8 +12,10 @@ import { FirebaseModule } from './firebase/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { StatusModule } from './modules/status/status.module';
+import { UploadSessionsModule } from './modules/upload-sessions/upload-sessions.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { PrismaModule } from './prisma/prisma.module';
     FirebaseModule,
     AuthModule,
     OnboardingModule,
+    StorageModule,
+    UploadSessionsModule,
   ],
   providers: [LogRetentionService],
 })

@@ -35,6 +35,19 @@ enum FileType {
   OTHER
 }
 
+enum UploadSessionStatus {
+  DRAFT
+  COMMITTED
+  ABORTED
+  EXPIRED
+}
+
+enum UploadItemKind {
+  LOGO
+  PHOTO
+  DOCUMENT
+}
+
 // MODELS
 
 model User {
@@ -75,6 +88,7 @@ model Business {
   status      BusinessStatus @default(PENDING)
   categories  BusinessCategory[]
   files       File[]         @relation("BusinessFiles")
+  uploadSessions UploadSession[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -125,13 +139,50 @@ model BusinessCategory {
 model File {
   id           String   @id @default(uuid())
   url          String
+  storageKey   String?  @unique
   type         FileType
   mimeType     String?
   sizeBytes    Int?
   originalName String?
-  businessId String?
-  business   Business? @relation("BusinessFiles", fields: [businessId], references: [id])
+  businessId   String?
+  business     Business? @relation("BusinessFiles", fields: [businessId], references: [id])
   logoBusiness Business? @relation("BusinessLogo")
   userAvatar   User?     @relation("UserAvatar")
+  sessionItems UploadSessionItem[]
   @@map("files")
+}
+
+
+model UploadSession {
+  id         String              @id @default(uuid())
+  businessId String
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  status     UploadSessionStatus @default(DRAFT)
+
+  items      UploadSessionItem[]
+
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([businessId, status])
+  @@map("upload_sessions")
+}
+
+model UploadSessionItem {
+  id        String        @id @default(uuid())
+  sessionId String
+  fileId    String
+  kind      UploadItemKind
+
+  session   UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  file      File          @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime      @default(now())
+
+  @@unique([sessionId, fileId])
+  @@index([sessionId, kind])
+  @@index([fileId])
+
+  @@map("upload_session_items")
 }
