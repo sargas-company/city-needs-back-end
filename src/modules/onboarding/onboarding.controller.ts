@@ -1,3 +1,4 @@
+// src/modules/onboarding/onboarding.controller.ts
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -23,6 +24,9 @@ import {
   BusinessProfileRequestDto,
   CustomerAddressRequestDto,
   CustomerCategoriesRequestDto,
+  BusinessVerificationSubmitRequestDto,
+  BusinessVerificationSubmitPayloadDto,
+  BusinessVerificationSkipRequestDto,
 } from './dto/onboarding-sumit-swagger.dto';
 import { OnboardingService } from './onboarding.service';
 
@@ -35,9 +39,12 @@ import { OnboardingService } from './onboarding.service';
   BusinessAddressRequestDto,
   BusinessFilesRequestDto,
   BusinessFilesSkipRequestDto,
+  BusinessVerificationSubmitRequestDto,
   AddressPayloadDto,
   CategoriesPayloadDto,
   BusinessProfilePayloadDto,
+  BusinessVerificationSubmitPayloadDto,
+  BusinessVerificationSkipRequestDto,
 )
 @Controller('onboarding')
 export class OnboardingController {
@@ -56,8 +63,11 @@ export class OnboardingController {
       '- BUSINESS_PROFILE\n' +
       '- BUSINESS_ADDRESS\n' +
       '- BUSINESS_FILES (commit upload session)\n' +
-      '- BUSINESS_FILES_SKIP (abort upload session)\n\n' +
-      'For BUSINESS_FILES you must upload files first via /onboarding/upload-session.',
+      '- BUSINESS_FILES_SKIP (abort upload session)\n' +
+      '- BUSINESS_VERIFICATION_SUBMIT (step 4)\n' +
+      '- BUSINESS_VERIFICATION_SKIP (step 4)\n\n' +
+      'For BUSINESS_FILES you must upload files first via /onboarding/upload-session.\n' +
+      'For BUSINESS_VERIFICATION_SUBMIT you must upload file first via /onboarding/verification-file.',
     schema: {
       discriminator: { propertyName: 'action' },
       oneOf: [
@@ -67,6 +77,8 @@ export class OnboardingController {
         { $ref: getSchemaPath(BusinessAddressRequestDto) },
         { $ref: getSchemaPath(BusinessFilesRequestDto) },
         { $ref: getSchemaPath(BusinessFilesSkipRequestDto) },
+        { $ref: getSchemaPath(BusinessVerificationSubmitRequestDto) },
+        { $ref: getSchemaPath(BusinessVerificationSkipRequestDto) },
       ],
     },
   })

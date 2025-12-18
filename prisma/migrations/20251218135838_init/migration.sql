@@ -10,7 +10,10 @@ CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
 CREATE TYPE "BusinessStatus" AS ENUM ('PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'OTHER');
+CREATE TYPE "BusinessVerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'BUSINESS_VERIFICATION_DOCUMENT', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "UploadSessionStatus" AS ENUM ('DRAFT', 'COMMITTED', 'ABORTED', 'EXPIRED');
@@ -49,10 +52,28 @@ CREATE TABLE "businesses" (
     "addressId" TEXT,
     "logo" TEXT,
     "status" "BusinessStatus" NOT NULL DEFAULT 'PENDING',
+    "categoryId" TEXT NOT NULL,
+    "verificationGraceDeadlineAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "businesses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "business_verifications" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "status" "BusinessVerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "verificationFileId" TEXT NOT NULL,
+    "submittedAt" TIMESTAMP(3),
+    "reviewedAt" TIMESTAMP(3),
+    "reviewedByAdminId" TEXT,
+    "rejectionReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "business_verifications_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -74,6 +95,8 @@ CREATE TABLE "categories" (
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
+    "requiresVerification" BOOLEAN NOT NULL DEFAULT false,
+    "gracePeriodHours" INTEGER,
 
     CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
 );
@@ -87,14 +110,6 @@ CREATE TABLE "user_categories" (
 );
 
 -- CreateTable
-CREATE TABLE "business_categories" (
-    "businessId" TEXT NOT NULL,
-    "categoryId" TEXT NOT NULL,
-
-    CONSTRAINT "business_categories_pkey" PRIMARY KEY ("businessId","categoryId")
-);
-
--- CreateTable
 CREATE TABLE "files" (
     "id" TEXT NOT NULL,
     "url" TEXT NOT NULL,
@@ -104,6 +119,8 @@ CREATE TABLE "files" (
     "sizeBytes" INTEGER,
     "originalName" TEXT,
     "businessId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "files_pkey" PRIMARY KEY ("id")
 );
@@ -155,6 +172,15 @@ CREATE UNIQUE INDEX "businesses_addressId_key" ON "businesses"("addressId");
 CREATE UNIQUE INDEX "businesses_logo_key" ON "businesses"("logo");
 
 -- CreateIndex
+CREATE INDEX "businesses_categoryId_idx" ON "businesses"("categoryId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "business_verifications_verificationFileId_key" ON "business_verifications"("verificationFileId");
+
+-- CreateIndex
+CREATE INDEX "business_verifications_businessId_status_idx" ON "business_verifications"("businessId", "status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "categories_title_key" ON "categories"("title");
 
 -- CreateIndex
@@ -191,19 +217,22 @@ ALTER TABLE "businesses" ADD CONSTRAINT "businesses_addressId_fkey" FOREIGN KEY 
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_logo_fkey" FOREIGN KEY ("logo") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "businesses" ADD CONSTRAINT "businesses_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "business_verifications" ADD CONSTRAINT "business_verifications_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "business_categories" ADD CONSTRAINT "business_categories_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "business_verifications" ADD CONSTRAINT "business_verifications_verificationFileId_fkey" FOREIGN KEY ("verificationFileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "business_categories" ADD CONSTRAINT "business_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "upload_sessions" ADD CONSTRAINT "upload_sessions_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -214,45 +243,60 @@ ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_sessionI
 -- AddForeignKey
 ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "upload_sessions_one_draft_per_business"
-ON "upload_sessions" ("businessId")
-WHERE "status" = 'DRAFT';
-
-INSERT INTO "categories" ("id", "title", "slug", "description")
+INSERT INTO "categories" (
+  "id",
+  "title",
+  "slug",
+  "description",
+  "requiresVerification",
+  "gracePeriodHours"
+)
 VALUES
   (
     gen_random_uuid(),
     'Beauty & Wellness',
     'beauty-wellness',
-    'Beauty, wellness, health, and self-care services'
+    'Beauty, wellness, health, and self-care services',
+    FALSE,
+    NULL
   ),
   (
     gen_random_uuid(),
     'Cleaning',
     'cleaning',
-    'Home and commercial cleaning services'
+    'Home and commercial cleaning services',
+    FALSE,
+    NULL
   ),
   (
     gen_random_uuid(),
     'Pet Care',
     'pet-care',
-    'Pet sitting, grooming, walking, and care services'
+    'Pet sitting, grooming, walking, and care services',
+    TRUE,
+    NULL
   ),
   (
     gen_random_uuid(),
     'Home Repairs',
     'home-repairs',
-    'Maintenance, renovation, and repair services'
+    'Maintenance, renovation, and repair services',
+    FALSE,
+    NULL
   ),
   (
     gen_random_uuid(),
     'Delivery & Assistance',
     'delivery-assistance',
-    'Delivery, errands, and personal assistance services'
+    'Delivery, errands, and personal assistance services',
+    TRUE,
+    12
   ),
   (
     gen_random_uuid(),
     'Other',
     'other',
-    'Other services that do not fit into main categories'
+    'Other services that do not fit into main categories',
+    TRUE,
+    24
   );

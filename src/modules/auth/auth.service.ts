@@ -6,17 +6,171 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, User, UserRole, UserStatus } from '@prisma/client';
+import { Prisma, User, UserRole, UserStatus, BusinessStatus } from '@prisma/client';
 import * as admin from 'firebase-admin';
 import { PrismaService } from 'src/prisma/prisma.service';
 
+import { AuthMeDto, BusinessVerificationNextAction } from './dto/auth-me.dto';
 import { AuthSyncRequestDto } from './dto/auth-sync-request.dto';
 import { UserDto } from './dto/user.dto';
+
+type MeLoadedUser = Prisma.UserGetPayload<{
+  include: {
+    business: {
+      include: {
+        address: true;
+        logo: true;
+        category: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   constructor(private readonly prisma: PrismaService) {}
+
+  async getMe(userId: string): Promise<AuthMeDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        business: {
+          include: {
+            address: true,
+            logo: true,
+            // We need requiresVerification/gracePeriodHours for gate computation,
+            // but we will NOT expose them in BusinessDto.category
+            category: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User is not synced');
+    }
+
+    const userDto = this.mapToUserDto(user);
+
+    const business = user.business
+      ? {
+          id: user.business.id,
+          name: user.business.name,
+          description: user.business.description,
+          phone: user.business.phone,
+          email: user.business.email,
+          status: user.business.status,
+          categoryId: user.business.categoryId,
+          verificationGraceDeadlineAt: user.business.verificationGraceDeadlineAt,
+          addressId: user.business.addressId ?? null,
+          address: user.business.address
+            ? {
+                id: user.business.address.id,
+                countryCode: user.business.address.countryCode,
+                city: user.business.address.city,
+                state: user.business.address.state,
+                addressLine1: user.business.address.addressLine1,
+                addressLine2: user.business.address.addressLine2 ?? null,
+                zip: user.business.address.zip ?? null,
+              }
+            : null,
+          logoId: user.business.logoId ?? null,
+          logo: user.business.logo
+            ? {
+                id: user.business.logo.id,
+                url: user.business.logo.url,
+                type: user.business.logo.type,
+                mimeType: user.business.logo.mimeType ?? null,
+                sizeBytes: user.business.logo.sizeBytes ?? null,
+                originalName: user.business.logo.originalName ?? null,
+              }
+            : null,
+          category: user.business.category
+            ? {
+                id: user.business.category.id,
+                title: user.business.category.title,
+                slug: user.business.category.slug,
+                description: user.business.category.description ?? null,
+              }
+            : null,
+        }
+      : null;
+
+    const verification = this.computeBusinessVerificationGate(user);
+
+    return {
+      user: userDto,
+      business,
+      verification,
+    };
+  }
+
+  /**
+   * Gate logic v1 (Stage 2):
+   * - Uses business.category.requiresVerification + business.verificationGraceDeadlineAt + business.status
+   * - No business_verifications history yet (WAIT_REVIEW/RESUBMIT later)
+   */
+  private computeBusinessVerificationGate(user: MeLoadedUser): AuthMeDto['verification'] {
+    if (user.role !== UserRole.BUSINESS_OWNER) return null;
+    if (!user.business) return null;
+
+    const category = user.business.category;
+    if (!category) {
+      // should not happen if onboarding is correct
+      return {
+        requiresVerification: false,
+        graceDeadlineAt: null,
+        graceExpired: false,
+        status: user.business.status,
+        canUseApp: true,
+        nextAction: BusinessVerificationNextAction.NONE,
+      };
+    }
+
+    const requiresVerification = category.requiresVerification;
+
+    if (!requiresVerification) {
+      return {
+        requiresVerification: false,
+        graceDeadlineAt: null,
+        graceExpired: false,
+        status: user.business.status,
+        canUseApp: true,
+        nextAction: BusinessVerificationNextAction.NONE,
+      };
+    }
+
+    // If approved/active => always can use
+    if (user.business.status === BusinessStatus.ACTIVE) {
+      return {
+        requiresVerification: true,
+        graceDeadlineAt: user.business.verificationGraceDeadlineAt ?? null,
+        graceExpired: false,
+        status: user.business.status,
+        canUseApp: true,
+        nextAction: BusinessVerificationNextAction.NONE,
+      };
+    }
+
+    const deadline = user.business.verificationGraceDeadlineAt;
+    const now = new Date();
+
+    // If deadline is missing, treat as "immediate" (safe default)
+    const graceExpired = !deadline ? true : now >= deadline;
+    const canUseApp = !graceExpired;
+
+    return {
+      requiresVerification: true,
+      graceDeadlineAt: deadline ?? null,
+      graceExpired,
+      status: user.business.status,
+      canUseApp,
+      nextAction: canUseApp
+        ? BusinessVerificationNextAction.NONE
+        : BusinessVerificationNextAction.GO_TO_VERIFICATION,
+    };
+  }
 
   /**
    * Sync user from Firebase:

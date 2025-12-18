@@ -1,3 +1,4 @@
+// src/modules/onboarding/dto/onboarding-submit.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsArray, IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
 
@@ -56,11 +57,15 @@ export class BusinessProfilePayloadDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ type: [String] })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  categoryIds!: string[];
+  @ApiProperty()
+  @IsString()
+  categoryId!: string;
+}
+
+export class BusinessVerificationSubmitPayloadDto {
+  @ApiProperty({ description: 'File id returned from POST /onboarding/verification-file' })
+  @IsString()
+  verificationFileId!: string;
 }
 
 export class OnboardingSubmitDto {

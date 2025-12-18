@@ -4,9 +4,11 @@ import { BullBoardModule } from '@bull-board/nestjs';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import basicAuth from 'express-basic-auth';
 
+import { BusinessVerificationGuard } from './common/guards/business-verification.guard';
 import { LogRetentionService } from './common/services/logger/log-retention.service';
 import { FirebaseModule } from './firebase/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -14,6 +16,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { StatusModule } from './modules/status/status.module';
 import { UploadSessionsModule } from './modules/upload-sessions/upload-sessions.module';
 import { UsersModule } from './modules/users/users.module';
+import { VerificationFilesModule } from './modules/verification-files/verification-files.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -43,7 +46,14 @@ import { StorageModule } from './storage/storage.module';
     OnboardingModule,
     StorageModule,
     UploadSessionsModule,
+    VerificationFilesModule,
   ],
-  providers: [LogRetentionService],
+  providers: [
+    LogRetentionService,
+    {
+      provide: APP_GUARD,
+      useClass: BusinessVerificationGuard,
+    },
+  ],
 })
 export class AppModule {}

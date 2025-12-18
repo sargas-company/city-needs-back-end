@@ -1,3 +1,4 @@
+// src/modules/onboarding/dto/onboarding-sumit-swagger.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { OnboardingAction } from '../types/onboarding.types';
@@ -44,8 +45,13 @@ export class BusinessProfilePayloadDto {
   @ApiProperty({ example: 'hello@bestcoffee.com' })
   email!: string;
 
-  @ApiProperty({ type: [String], example: ['cat_id_1', 'cat_id_2'] })
-  categoryIds!: string[];
+  @ApiProperty({ example: 'cat_id_1' })
+  categoryId!: string;
+}
+
+export class BusinessVerificationSubmitPayloadDto {
+  @ApiProperty({ example: 'file_uuid_here' })
+  verificationFileId!: string;
 }
 
 // --------------------
@@ -101,6 +107,31 @@ export class BusinessFilesSkipRequestDto {
 
   @ApiPropertyOptional({
     description: 'Optional JSON string, usually empty',
+    example: '{}',
+  })
+  payload?: Record<string, never>;
+}
+
+export class BusinessVerificationSubmitRequestDto {
+  @ApiProperty({
+    enum: OnboardingAction,
+    example: OnboardingAction.BUSINESS_VERIFICATION_SUBMIT,
+  })
+  action!: OnboardingAction.BUSINESS_VERIFICATION_SUBMIT;
+
+  @ApiProperty({ type: BusinessVerificationSubmitPayloadDto })
+  payload!: BusinessVerificationSubmitPayloadDto;
+}
+
+export class BusinessVerificationSkipRequestDto {
+  @ApiProperty({
+    enum: OnboardingAction,
+    example: OnboardingAction.BUSINESS_VERIFICATION_SKIP,
+  })
+  action!: OnboardingAction.BUSINESS_VERIFICATION_SKIP;
+
+  @ApiPropertyOptional({
+    description: 'Optional empty JSON',
     example: '{}',
   })
   payload?: Record<string, never>;

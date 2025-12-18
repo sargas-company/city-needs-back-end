@@ -4,6 +4,7 @@ import { User } from '@prisma/client';
 import * as admin from 'firebase-admin';
 import { CurrentFirebaseUser } from 'src/common/decorators/current-firebase-user.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { SkipBusinessVerification } from 'src/common/decorators/skip-business-verification.decorator';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { FirebaseAuthGuard } from 'src/common/guards/firebase-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
@@ -25,6 +26,7 @@ export class AuthController {
 
   @Post('sync')
   @UseGuards(FirebaseAuthGuard)
+  @SkipBusinessVerification()
   @SwaggerAuthSync()
   async sync(
     @CurrentFirebaseUser() firebaseUser: admin.auth.DecodedIdToken,
@@ -41,12 +43,13 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(DbUserAuthGuard)
+  @SkipBusinessVerification()
   @SwaggerAuthMe()
   async me(@CurrentUser() user: User) {
-    const dto = this.authService.mapToUserDto(user);
+    const me = await this.authService.getMe(user.id);
 
     return successResponse({
-      data: dto,
+      data: me,
       message: 'Current user info',
     });
   }

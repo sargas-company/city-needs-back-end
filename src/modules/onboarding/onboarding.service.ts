@@ -1,3 +1,4 @@
+// src/modules/onboarding/onboarding.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -5,7 +6,15 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { Prisma, User, UserRole, UserStatus } from '@prisma/client';
+import {
+  BusinessStatus,
+  BusinessVerificationStatus,
+  FileType,
+  Prisma,
+  User,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -15,13 +24,23 @@ import {
   BusinessProfilePayloadDto,
   CategoriesPayloadDto,
   OnboardingSubmitDto,
+  BusinessVerificationSubmitPayloadDto,
 } from './dto/onboarding-submit.dto';
 import { OnboardingAction, OnboardingStatus } from './types/onboarding.types';
 import { UploadSessionsService } from '../upload-sessions/upload-sessions.service';
 
 type LoadedUser = Prisma.UserGetPayload<{
   include: {
-    business: { select: { id: true; addressId: true; logoId: true } };
+    business: {
+      select: {
+        id: true;
+        addressId: true;
+        logoId: true;
+        status: true;
+        verificationGraceDeadlineAt: true;
+        category: { select: { id: true; requiresVerification: true } };
+      };
+    };
   };
 }>;
 
@@ -79,6 +98,14 @@ export class OnboardingService {
             await this.handleBusinessAddress(tx, user, payload);
             return;
 
+          case OnboardingAction.BUSINESS_VERIFICATION_SUBMIT:
+            await this.handleBusinessVerificationSubmit(tx, user, payload);
+            return;
+
+          case OnboardingAction.BUSINESS_VERIFICATION_SKIP:
+            await this.handleBusinessVerificationSkip(tx, user);
+            return;
+
           default:
             throw new BadRequestException('Unknown onboarding action');
         }
@@ -100,8 +127,6 @@ export class OnboardingService {
     };
   }
 
-  // State / Status
-
   private computeStatus(user: LoadedUser): OnboardingStatus {
     if (user.role === null) {
       return {
@@ -114,7 +139,7 @@ export class OnboardingService {
       };
     }
 
-    const totalSteps = user.role === UserRole.END_USER ? 2 : 3;
+    const totalSteps = user.role === UserRole.END_USER ? 2 : 4;
 
     if (user.onboardingStep === null) {
       return {
@@ -123,14 +148,10 @@ export class OnboardingService {
         currentStep: null,
         totalSteps,
         allowedActions: [],
-        requiredScreen:
-          user.role === UserRole.END_USER
-            ? OnboardingAction.CUSTOMER_CATEGORIES
-            : OnboardingAction.BUSINESS_FILES,
+        requiredScreen: null,
       };
     }
 
-    // END_USER
     if (user.role === UserRole.END_USER) {
       if (user.onboardingStep === 1) {
         return {
@@ -166,7 +187,6 @@ export class OnboardingService {
       }
     }
 
-    // BUSINESS_OWNER
     if (user.role === UserRole.BUSINESS_OWNER) {
       if (user.onboardingStep === 1) {
         return {
@@ -222,9 +242,39 @@ export class OnboardingService {
           requiredScreen: OnboardingAction.BUSINESS_FILES,
         };
       }
+
+      if (user.onboardingStep === 4) {
+        if (!user.business?.id) {
+          return {
+            isCompleted: false,
+            role: user.role,
+            currentStep: 1,
+            totalSteps,
+            allowedActions: [OnboardingAction.BUSINESS_PROFILE],
+            requiredScreen: OnboardingAction.BUSINESS_PROFILE,
+          };
+        }
+
+        const requiresVerification = user.business?.category?.requiresVerification === true;
+        const deadline = user.business?.verificationGraceDeadlineAt ?? null;
+        const graceExpired = !deadline || deadline.getTime() <= Date.now();
+
+        const skipAllowed = !(requiresVerification && graceExpired);
+
+        const allowedActions: OnboardingAction[] = [OnboardingAction.BUSINESS_VERIFICATION_SUBMIT];
+        if (skipAllowed) allowedActions.push(OnboardingAction.BUSINESS_VERIFICATION_SKIP);
+
+        return {
+          isCompleted: false,
+          role: user.role,
+          currentStep: 4,
+          totalSteps,
+          allowedActions,
+          requiredScreen: OnboardingAction.BUSINESS_VERIFICATION_SUBMIT,
+        };
+      }
     }
 
-    // fallback unexpected step
     return {
       isCompleted: false,
       role: user.role,
@@ -247,15 +297,10 @@ export class OnboardingService {
   ) {
     const dto = await this.validatePayload(AddressPayloadDto, payload);
 
-    if (dto.countryCode !== 'CA') {
-      throw new BadRequestException('Only CA countryCode is supported for now');
-    }
+    if (dto.countryCode !== 'CA') throw new BadRequestException('Only CA countryCode is supported');
 
     if (user.addressId) {
-      await tx.user.update({
-        where: { id: user.id },
-        data: { onboardingStep: 2 },
-      });
+      await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 2 } });
       return;
     }
 
@@ -272,10 +317,7 @@ export class OnboardingService {
 
     await tx.user.update({
       where: { id: user.id },
-      data: {
-        addressId: address.id,
-        onboardingStep: 2,
-      },
+      data: { addressId: address.id, onboardingStep: 2 },
     });
   }
 
@@ -286,14 +328,11 @@ export class OnboardingService {
   ) {
     const dto = await this.validatePayload(CategoriesPayloadDto, payload);
 
-    if (!user.addressId) {
-      throw new ConflictException('Address is required before selecting categories');
-    }
+    if (!user.addressId) throw new ConflictException('Address is required before categories');
 
     const found = await tx.category.count({ where: { id: { in: dto.categoryIds } } });
-    if (found !== dto.categoryIds.length) {
+    if (found !== dto.categoryIds.length)
       throw new BadRequestException('Some categories do not exist');
-    }
 
     await tx.userCategory.deleteMany({ where: { userId: user.id } });
     await tx.userCategory.createMany({
@@ -301,10 +340,7 @@ export class OnboardingService {
       skipDuplicates: true,
     });
 
-    await tx.user.update({
-      where: { id: user.id },
-      data: { onboardingStep: null },
-    });
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
   }
 
   private async handleBusinessProfile(
@@ -314,38 +350,38 @@ export class OnboardingService {
   ) {
     const dto = await this.validatePayload(BusinessProfilePayloadDto, payload);
 
-    const found = await tx.category.count({ where: { id: { in: dto.categoryIds } } });
-    if (found !== dto.categoryIds.length) {
-      throw new BadRequestException('Some categories do not exist');
+    const category = await tx.category.findUnique({
+      where: { id: dto.categoryId },
+      select: { id: true, requiresVerification: true, gracePeriodHours: true },
+    });
+    if (!category) throw new BadRequestException('Category does not exist');
+
+    let verificationGraceDeadlineAt: Date | null = null;
+    if (category.requiresVerification) {
+      verificationGraceDeadlineAt =
+        category.gracePeriodHours === null
+          ? new Date()
+          : new Date(Date.now() + category.gracePeriodHours * 60 * 60 * 1000);
     }
 
     if (user.business?.id) {
-      await tx.user.update({
-        where: { id: user.id },
-        data: { onboardingStep: 2 },
-      });
+      await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 2 } });
       return;
     }
 
-    const business = await tx.business.create({
+    await tx.business.create({
       data: {
         ownerUserId: user.id,
         name: dto.name,
         description: dto.description,
         phone: dto.phone,
         email: dto.email,
+        categoryId: category.id,
+        verificationGraceDeadlineAt,
       },
     });
 
-    await tx.businessCategory.createMany({
-      data: dto.categoryIds.map((categoryId) => ({ businessId: business.id, categoryId })),
-      skipDuplicates: true,
-    });
-
-    await tx.user.update({
-      where: { id: user.id },
-      data: { onboardingStep: 2 },
-    });
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 2 } });
   }
 
   private async handleBusinessAddress(
@@ -355,20 +391,16 @@ export class OnboardingService {
   ) {
     const dto = await this.validatePayload(AddressPayloadDto, payload);
 
-    if (dto.countryCode !== 'CA') {
-      throw new BadRequestException('Only CA countryCode is supported for now');
-    }
+    if (dto.countryCode !== 'CA') throw new BadRequestException('Only CA countryCode is supported');
 
     const business = await tx.business.findUnique({
       where: { ownerUserId: user.id },
+      select: { id: true, addressId: true },
     });
-    if (!business) throw new ConflictException('Business must be created before business address');
+    if (!business) throw new ConflictException('Business must exist before business address');
 
     if (business.addressId) {
-      await tx.user.update({
-        where: { id: user.id },
-        data: { onboardingStep: 3 },
-      });
+      await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
       return;
     }
 
@@ -383,33 +415,129 @@ export class OnboardingService {
       },
     });
 
-    await tx.business.update({
-      where: { id: business.id },
-      data: { addressId: address.id },
-    });
-
-    await tx.user.update({
-      where: { id: user.id },
-      data: { onboardingStep: 3 },
-    });
+    await tx.business.update({ where: { id: business.id }, data: { addressId: address.id } });
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
   }
 
   private async handleBusinessFiles(user: User) {
     await this.uploadSessions.commitDraftForOnboarding(user);
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { onboardingStep: null },
+    const business = await this.prisma.business.findUnique({
+      where: { ownerUserId: user.id },
+      select: { id: true },
     });
+
+    if (!business) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
+      return;
+    }
+
+    await this.prisma.user.update({ where: { id: user.id }, data: { onboardingStep: 4 } });
   }
 
   private async handleBusinessFilesSkip(user: User) {
-    await this.uploadSessions.abortDraft(user);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { onboardingStep: null },
+    const business = await this.prisma.business.findUnique({
+      where: { ownerUserId: user.id },
+      select: { id: true },
     });
+    if (!business) throw new ForbiddenException('Business is required');
+
+    await this.uploadSessions.abortDraft(user);
+    await this.prisma.user.update({ where: { id: user.id }, data: { onboardingStep: 4 } });
+  }
+
+  private async handleBusinessVerificationSkip(tx: Prisma.TransactionClient, user: LoadedUser) {
+    if (user.role !== UserRole.BUSINESS_OWNER) {
+      throw new ForbiddenException('Only BUSINESS_OWNER can skip verification step');
+    }
+
+    const business = await tx.business.findUnique({
+      where: { ownerUserId: user.id },
+      select: {
+        id: true,
+        verificationGraceDeadlineAt: true,
+        category: { select: { requiresVerification: true } },
+      },
+    });
+    if (!business) throw new ConflictException('Business is required');
+
+    const requiresVerification = business.category?.requiresVerification === true;
+    const deadline = business.verificationGraceDeadlineAt ?? null;
+    const graceExpired = !deadline || deadline.getTime() <= Date.now();
+
+    if (requiresVerification && graceExpired) {
+      throw new ConflictException(
+        'Cannot skip verification: verification is required and grace period is expired or not provided',
+      );
+    }
+
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
+  }
+
+  private async handleBusinessVerificationSubmit(
+    tx: Prisma.TransactionClient,
+    user: LoadedUser,
+    payload: any,
+  ) {
+    if (user.role !== UserRole.BUSINESS_OWNER) {
+      throw new ForbiddenException('Only BUSINESS_OWNER can submit verification');
+    }
+
+    const dto = await this.validatePayload(BusinessVerificationSubmitPayloadDto, payload);
+
+    const business = await tx.business.findUnique({
+      where: { ownerUserId: user.id },
+      select: {
+        id: true,
+        status: true,
+        category: { select: { requiresVerification: true } },
+      },
+    });
+
+    if (!business) throw new ConflictException('Business is required before verification submit');
+    if (!business.category?.requiresVerification) {
+      throw new ConflictException('Verification is not required for this business category');
+    }
+
+    const file = await tx.file.findUnique({
+      where: { id: dto.verificationFileId },
+      select: { id: true, businessId: true, type: true },
+    });
+
+    if (!file) throw new BadRequestException('Verification file not found');
+    if (file.businessId !== business.id) throw new ForbiddenException('Verification file чужой');
+    if (file.type !== FileType.BUSINESS_VERIFICATION_DOCUMENT) {
+      throw new BadRequestException('File is not a BUSINESS_VERIFICATION_DOCUMENT');
+    }
+
+    const locked = await tx.businessVerification.findFirst({
+      where: {
+        businessId: business.id,
+        status: { in: [BusinessVerificationStatus.PENDING, BusinessVerificationStatus.APPROVED] },
+      },
+      select: { id: true, status: true },
+    });
+    if (locked) {
+      throw new ConflictException(
+        `Verification is locked (${locked.status}). Cannot submit a new verification.`,
+      );
+    }
+
+    await tx.businessVerification.create({
+      data: {
+        businessId: business.id,
+        status: BusinessVerificationStatus.PENDING,
+        verificationFileId: file.id,
+        submittedAt: new Date(),
+      },
+    });
+
+    await tx.business.update({
+      where: { id: business.id },
+      data: { status: BusinessStatus.PENDING },
+    });
+
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
   }
 
   // Helpers
@@ -418,14 +546,20 @@ export class OnboardingService {
     const user = await this.prisma.user.findUnique({
       where: { authExternalId: firebaseUid },
       include: {
-        business: { select: { id: true, addressId: true, logoId: true } },
+        business: {
+          select: {
+            id: true,
+            addressId: true,
+            logoId: true,
+            status: true,
+            verificationGraceDeadlineAt: true,
+            category: { select: { id: true, requiresVerification: true } },
+          },
+        },
       },
     });
 
-    if (!user) {
-      throw new BadRequestException('User is not synced. Call /auth/sync first');
-    }
-
+    if (!user) throw new BadRequestException('User is not synced. Call /auth/sync first');
     return user;
   }
 

@@ -1,4 +1,3 @@
-// src/common/guards/db-user-auth.guard.ts
 import {
   CanActivate,
   ExecutionContext,
@@ -6,23 +5,29 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { User, UserStatus } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
 import { Request } from 'express';
 import * as admin from 'firebase-admin';
 import { FirebaseService } from 'src/firebase/firebase.service';
-import { AuthService } from 'src/modules/auth/auth.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+
+import { AuthedRequestGate } from '../types/request-content.type';
 
 @Injectable()
 export class DbUserAuthGuard implements CanActivate {
   constructor(
     private readonly firebaseService: FirebaseService,
-    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context
-      .switchToHttp()
-      .getRequest<Request & { firebaseUser?: admin.auth.DecodedIdToken; user?: User }>();
+    const request = context.switchToHttp().getRequest<
+      Request & {
+        firebaseUser?: admin.auth.DecodedIdToken;
+        user?: any;
+        gate?: AuthedRequestGate;
+      }
+    >();
 
     const authHeader = request.headers.authorization;
 
@@ -45,7 +50,28 @@ export class DbUserAuthGuard implements CanActivate {
 
     request.firebaseUser = firebaseUser;
 
-    const dbUser = await this.authService.getUserByFirebaseUid(firebaseUser);
+    const uid = firebaseUser.uid;
+    if (!uid) {
+      throw new UnauthorizedException('Invalid Firebase token payload');
+    }
+
+    const dbUser = await this.prisma.user.findUnique({
+      where: { authExternalId: uid },
+      include: {
+        business: {
+          select: {
+            id: true,
+            status: true,
+            verificationGraceDeadlineAt: true,
+            category: { select: { requiresVerification: true } },
+          },
+        },
+      },
+    });
+
+    if (!dbUser) {
+      throw new UnauthorizedException('User is not synced');
+    }
 
     if (dbUser.status === UserStatus.SUSPENDED) {
       throw new ForbiddenException('User is suspended');
@@ -56,6 +82,17 @@ export class DbUserAuthGuard implements CanActivate {
     }
 
     request.user = dbUser;
+
+    request.gate = {
+      role: dbUser.role,
+      onboardingStep: dbUser.onboardingStep,
+      business: {
+        businessId: dbUser.business?.id ?? null,
+        businessStatus: dbUser.business?.status ?? null,
+        verificationGraceDeadlineAt: dbUser.business?.verificationGraceDeadlineAt ?? null,
+        requiresVerification: dbUser.business?.category?.requiresVerification ?? null,
+      },
+    };
 
     return true;
   }

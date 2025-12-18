@@ -13,6 +13,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { UploadItemKind, User } from '@prisma/client';
 import { memoryStorage } from 'multer';
+import { SkipBusinessVerification } from 'src/common/decorators/skip-business-verification.decorator';
 
 import { UploadFileDto } from './dto/upload-file.dto';
 import { UploadSessionsService } from './upload-sessions.service';
@@ -24,6 +25,7 @@ import { successResponse } from '../../common/utils/response.util';
 @ApiBearerAuth()
 @Controller('/onboarding/upload-session')
 @UseGuards(DbUserAuthGuard)
+@SkipBusinessVerification()
 export class UploadSessionsController {
   constructor(private readonly uploadSessionsService: UploadSessionsService) {}
 

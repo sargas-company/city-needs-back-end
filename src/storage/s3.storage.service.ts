@@ -1,4 +1,11 @@
-import { PutObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+// src/storage/s3.storage.service.ts
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -59,6 +66,62 @@ export class S3StorageService extends StorageService {
         err?.stack ?? String(err),
       );
       throw new InternalServerErrorException('Failed to upload file');
+    }
+  }
+
+  async uploadPrivate(input: StorageUploadInput): Promise<{ storageKey: string }> {
+    this.assertValidKey(input.storageKey);
+    if (!input.storageKey.startsWith('private/')) {
+      throw new InternalServerErrorException(
+        'uploadPrivate must use storageKey starting with private/',
+      );
+    }
+
+    try {
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: input.storageKey,
+          Body: input.body,
+          ContentType: input.contentType,
+          CacheControl: input.cacheControl ?? 'private, max-age=0, no-cache',
+        }),
+      );
+
+      this.logger.log(
+        `Uploaded private object: bucket=${this.bucket} key=${input.storageKey} size=${input.body.length}`,
+      );
+
+      return { storageKey: input.storageKey };
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to upload private object: bucket=${this.bucket} key=${input.storageKey}`,
+        err?.stack ?? String(err),
+      );
+      throw new InternalServerErrorException('Failed to upload file');
+    }
+  }
+
+  async getSignedDownloadUrl(storageKey: string, expiresInSeconds: number): Promise<string> {
+    this.assertValidKey(storageKey);
+
+    try {
+      const url = await getSignedUrl(
+        this.s3,
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: storageKey,
+        }),
+        { expiresIn: expiresInSeconds },
+      );
+
+      return url;
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to sign download url: bucket=${this.bucket} key=${storageKey}`,
+        err?.stack ?? String(err),
+      );
+      throw new InternalServerErrorException('Failed to generate download URL');
     }
   }
 
