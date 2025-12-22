@@ -99,11 +99,30 @@ model Business {
   files          File[]           @relation("BusinessFiles")
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
+  businessHours BusinessHour[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([categoryId])
   @@map("businesses")
+}
+
+model BusinessHour {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  weekday    Int
+  startTime  DateTime? @db.Time
+  endTime    DateTime? @db.Time
+  isClosed   Boolean  @default(false)
+  is24h      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([weekday])
+  @@index([businessId, weekday])
+  @@map("business_hours")
 }
 
 model BusinessVerification {

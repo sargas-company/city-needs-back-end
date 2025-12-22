@@ -61,6 +61,21 @@ CREATE TABLE "businesses" (
 );
 
 -- CreateTable
+CREATE TABLE "business_hours" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "weekday" INTEGER NOT NULL,
+    "startTime" TIME,
+    "endTime" TIME,
+    "isClosed" BOOLEAN NOT NULL DEFAULT false,
+    "is24h" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "business_hours_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "business_verifications" (
     "id" TEXT NOT NULL,
     "businessId" TEXT NOT NULL,
@@ -175,6 +190,15 @@ CREATE UNIQUE INDEX "businesses_logo_key" ON "businesses"("logo");
 CREATE INDEX "businesses_categoryId_idx" ON "businesses"("categoryId");
 
 -- CreateIndex
+CREATE INDEX "business_hours_businessId_idx" ON "business_hours"("businessId");
+
+-- CreateIndex
+CREATE INDEX "business_hours_weekday_idx" ON "business_hours"("weekday");
+
+-- CreateIndex
+CREATE INDEX "business_hours_businessId_weekday_idx" ON "business_hours"("businessId", "weekday");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "business_verifications_verificationFileId_key" ON "business_verifications"("verificationFileId");
 
 -- CreateIndex
@@ -218,6 +242,9 @@ ALTER TABLE "businesses" ADD CONSTRAINT "businesses_logo_fkey" FOREIGN KEY ("log
 
 -- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "business_hours" ADD CONSTRAINT "business_hours_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "business_verifications" ADD CONSTRAINT "business_verifications_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
