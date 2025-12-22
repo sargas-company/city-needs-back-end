@@ -161,7 +161,13 @@ export class VerificationFilesService {
     const locked = await this.prisma.businessVerification.findFirst({
       where: {
         businessId: business.id,
-        status: { in: [BusinessVerificationStatus.PENDING, BusinessVerificationStatus.APPROVED] },
+        status: {
+          in: [
+            BusinessVerificationStatus.PENDING,
+            BusinessVerificationStatus.APPROVED,
+            BusinessVerificationStatus.REJECTED,
+          ],
+        },
       },
       orderBy: { createdAt: 'desc' },
       select: {
