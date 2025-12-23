@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BusinessHour } from '@prisma/client';
+import { BusinessHour, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { BusinessHourDto, BusinessHoursDayDto } from './dto/business-hours.dto';
@@ -13,21 +13,33 @@ export class BusinessHoursService {
     businessId: string,
     items: UpdateBusinessHoursDto[],
   ): Promise<BusinessHoursDayDto[]> {
-    await this.ensureBusinessExists(businessId);
+    return this.prisma.$transaction((tx) => this.setBusinessHoursTx(tx, businessId, items));
+  }
+
+  async setBusinessHoursTx(
+    tx: Prisma.TransactionClient,
+    businessId: string,
+    items: UpdateBusinessHoursDto[],
+  ): Promise<BusinessHoursDayDto[]> {
+    await this.ensureBusinessExists(tx, businessId);
 
     const data = items.map((item) => this.toCreateInput(businessId, item));
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.businessHour.deleteMany({ where: { businessId } });
-      if (data.length === 0) return;
+    await tx.businessHour.deleteMany({ where: { businessId } });
+    if (data.length > 0) {
       await tx.businessHour.createMany({ data });
+    }
+
+    const hours = await tx.businessHour.findMany({
+      where: { businessId },
+      orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
     });
 
-    return this.getBusinessHours(businessId);
+    return this.groupByWeekday(hours);
   }
 
   async getBusinessHours(businessId: string): Promise<BusinessHoursDayDto[]> {
-    await this.ensureBusinessExists(businessId);
+    await this.ensureBusinessExists(this.prisma, businessId);
 
     const hours = await this.prisma.businessHour.findMany({
       where: { businessId },
@@ -37,8 +49,8 @@ export class BusinessHoursService {
     return this.groupByWeekday(hours);
   }
 
-  private async ensureBusinessExists(businessId: string) {
-    const business = await this.prisma.business.findUnique({
+  private async ensureBusinessExists(client: Prisma.TransactionClient, businessId: string) {
+    const business = await client.business.findUnique({
       where: { id: businessId },
       select: { id: true },
     });

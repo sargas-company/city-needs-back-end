@@ -12,6 +12,7 @@ import { User } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
+import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
 
 import { OnboardingSubmitDto } from './dto/onboarding-submit.dto';
 import {
@@ -45,6 +46,7 @@ import { OnboardingService } from './onboarding.service';
   BusinessProfilePayloadDto,
   BusinessVerificationSubmitPayloadDto,
   BusinessVerificationSkipRequestDto,
+  UpdateBusinessHoursDto,
 )
 @Controller('onboarding')
 export class OnboardingController {

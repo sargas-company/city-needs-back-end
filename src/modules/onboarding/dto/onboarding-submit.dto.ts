@@ -1,6 +1,16 @@
 // src/modules/onboarding/dto/onboarding-submit.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
 
 import { OnboardingAction } from '../types/onboarding.types';
 
@@ -60,6 +70,13 @@ export class BusinessProfilePayloadDto {
   @ApiProperty()
   @IsString()
   categoryId!: string;
+
+  @ApiPropertyOptional({ type: [UpdateBusinessHoursDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateBusinessHoursDto)
+  businessHours?: UpdateBusinessHoursDto[];
 }
 
 export class BusinessVerificationSubmitPayloadDto {

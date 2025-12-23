@@ -1,5 +1,6 @@
 // src/modules/onboarding/dto/onboarding-sumit-swagger.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
 
 import { OnboardingAction } from '../types/onboarding.types';
 
@@ -47,6 +48,9 @@ export class BusinessProfilePayloadDto {
 
   @ApiProperty({ example: 'cat_id_1' })
   categoryId!: string;
+
+  @ApiPropertyOptional({ type: [UpdateBusinessHoursDto] })
+  businessHours?: UpdateBusinessHoursDto[];
 }
 
 export class BusinessVerificationSubmitPayloadDto {

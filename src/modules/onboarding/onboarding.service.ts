@@ -17,6 +17,7 @@ import {
 } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { BusinessHoursService } from 'src/modules/business-hours/business-hours.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import {
@@ -51,6 +52,7 @@ export class OnboardingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadSessions: UploadSessionsService,
+    private readonly businessHours: BusinessHoursService,
   ) {}
 
   async submit(dbUser: User, dto: OnboardingSubmitDto) {
@@ -369,7 +371,7 @@ export class OnboardingService {
       return;
     }
 
-    await tx.business.create({
+    const business = await tx.business.create({
       data: {
         ownerUserId: user.id,
         name: dto.name,
@@ -380,6 +382,10 @@ export class OnboardingService {
         verificationGraceDeadlineAt,
       },
     });
+
+    if (Array.isArray(dto.businessHours)) {
+      await this.businessHours.setBusinessHoursTx(tx, business.id, dto.businessHours);
+    }
 
     await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 2 } });
   }
