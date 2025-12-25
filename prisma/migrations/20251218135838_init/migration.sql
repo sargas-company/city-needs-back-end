@@ -21,6 +21,9 @@ CREATE TYPE "UploadSessionStatus" AS ENUM ('DRAFT', 'COMMITTED', 'ABORTED', 'EXP
 -- CreateEnum
 CREATE TYPE "UploadItemKind" AS ENUM ('LOGO', 'PHOTO', 'DOCUMENT');
 
+-- CreateEnum
+CREATE TYPE "LocationSource" AS ENUM ('gps', 'manual');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -114,6 +117,22 @@ CREATE TABLE "categories" (
     "gracePeriodHours" INTEGER,
 
     CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_locations" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "lat" DOUBLE PRECISION NOT NULL,
+    "lng" DOUBLE PRECISION NOT NULL,
+    "source" "LocationSource" NOT NULL,
+    "provider" TEXT,
+    "placeId" TEXT,
+    "formattedAddress" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_locations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -211,6 +230,9 @@ CREATE UNIQUE INDEX "categories_title_key" ON "categories"("title");
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "user_locations_userId_key" ON "user_locations"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "files_storageKey_key" ON "files"("storageKey");
 
 -- CreateIndex
@@ -257,6 +279,9 @@ ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_userId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_locations" ADD CONSTRAINT "user_locations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;

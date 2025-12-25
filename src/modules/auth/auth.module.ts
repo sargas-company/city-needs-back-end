@@ -8,17 +8,20 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationService } from './email-verification.service';
+import { MeLocationController } from './me-location.controller';
+import { MeLocationService } from './me-location.service';
 import { PasswordResetService } from './password-reset.service';
 
 @Module({
   imports: [FirebaseModule, HttpModule],
-  controllers: [AuthController],
+  controllers: [AuthController, MeLocationController],
   providers: [
     AuthService,
     PrismaService,
     FirebaseAuthGuard,
     DbUserAuthGuard,
     EmailVerificationService,
+    MeLocationService,
     PasswordResetService,
   ],
   exports: [AuthService],

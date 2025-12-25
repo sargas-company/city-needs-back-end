@@ -55,6 +55,11 @@ enum UploadItemKind {
   DOCUMENT
 }
 
+enum LocationSource {
+  gps
+  manual
+}
+
 // MODELS
 
 model User {
@@ -74,10 +79,27 @@ model User {
   address   Address? @relation("UserAddress", fields: [addressId], references: [id])
   business  Business? @relation("UserBusiness")
   categories UserCategory[]
+  location   UserLocation?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   @@map("users")
+}
+
+model UserLocation {
+  id               String         @id @default(cuid())
+  userId           String         @unique
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lat              Float
+  lng              Float
+  source           LocationSource
+  provider         String?
+  placeId          String?
+  formattedAddress String?
+  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime       @default(now())
+
+  @@map("user_locations")
 }
 
 model Business {
