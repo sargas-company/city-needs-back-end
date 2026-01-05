@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CursorPaginationMetaDto {
   @ApiProperty({ nullable: true })
@@ -23,9 +25,24 @@ export class CursorPaginationResponseDto<T> {
 }
 
 export class CursorPaginationQueryDto {
-  @ApiPropertyOptional({ description: 'Cursor to continue from', example: '' })
+  @ApiPropertyOptional({
+    description: 'Cursor to continue from',
+    example: 'uuid-or-cursor-string',
+  })
+  @IsOptional()
+  @IsString()
   cursor?: string;
 
-  @ApiPropertyOptional({ description: 'Max number of items to return', default: 10 })
+  @ApiPropertyOptional({
+    description: 'Max number of items to return',
+    default: 10,
+    minimum: 1,
+    maximum: 50,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
   limit?: number;
 }

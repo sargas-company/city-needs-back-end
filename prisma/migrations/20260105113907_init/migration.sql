@@ -45,6 +45,22 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
+CREATE TABLE "user_locations" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "lat" DOUBLE PRECISION NOT NULL,
+    "lng" DOUBLE PRECISION NOT NULL,
+    "source" "LocationSource" NOT NULL,
+    "provider" TEXT,
+    "placeId" TEXT,
+    "formattedAddress" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_locations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "businesses" (
     "id" TEXT NOT NULL,
     "ownerUserId" TEXT NOT NULL,
@@ -61,6 +77,16 @@ CREATE TABLE "businesses" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "businesses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "saved_businesses" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "saved_businesses_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -117,22 +143,6 @@ CREATE TABLE "categories" (
     "gracePeriodHours" INTEGER,
 
     CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "user_locations" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "lat" DOUBLE PRECISION NOT NULL,
-    "lng" DOUBLE PRECISION NOT NULL,
-    "source" "LocationSource" NOT NULL,
-    "provider" TEXT,
-    "placeId" TEXT,
-    "formattedAddress" TEXT,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "user_locations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -197,6 +207,9 @@ CREATE UNIQUE INDEX "users_avatar_key" ON "users"("avatar");
 CREATE UNIQUE INDEX "users_addressId_key" ON "users"("addressId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "user_locations_userId_key" ON "user_locations"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "businesses_ownerUserId_key" ON "businesses"("ownerUserId");
 
 -- CreateIndex
@@ -207,6 +220,15 @@ CREATE UNIQUE INDEX "businesses_logo_key" ON "businesses"("logo");
 
 -- CreateIndex
 CREATE INDEX "businesses_categoryId_idx" ON "businesses"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "saved_businesses_userId_idx" ON "saved_businesses"("userId");
+
+-- CreateIndex
+CREATE INDEX "saved_businesses_businessId_idx" ON "saved_businesses"("businessId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "saved_businesses_userId_businessId_key" ON "saved_businesses"("userId", "businessId");
 
 -- CreateIndex
 CREATE INDEX "business_hours_businessId_idx" ON "business_hours"("businessId");
@@ -230,9 +252,6 @@ CREATE UNIQUE INDEX "categories_title_key" ON "categories"("title");
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_locations_userId_key" ON "user_locations"("userId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "files_storageKey_key" ON "files"("storageKey");
 
 -- CreateIndex
@@ -254,6 +273,9 @@ ALTER TABLE "users" ADD CONSTRAINT "users_avatar_fkey" FOREIGN KEY ("avatar") RE
 ALTER TABLE "users" ADD CONSTRAINT "users_addressId_fkey" FOREIGN KEY ("addressId") REFERENCES "addresses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "user_locations" ADD CONSTRAINT "user_locations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -264,6 +286,12 @@ ALTER TABLE "businesses" ADD CONSTRAINT "businesses_logo_fkey" FOREIGN KEY ("log
 
 -- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "saved_businesses" ADD CONSTRAINT "saved_businesses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "saved_businesses" ADD CONSTRAINT "saved_businesses_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "business_hours" ADD CONSTRAINT "business_hours_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -279,9 +307,6 @@ ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_userId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "user_categories" ADD CONSTRAINT "user_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_locations" ADD CONSTRAINT "user_locations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "files" ADD CONSTRAINT "files_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;

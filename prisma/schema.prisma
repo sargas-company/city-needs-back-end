@@ -80,6 +80,7 @@ model User {
   business  Business? @relation("UserBusiness")
   categories UserCategory[]
   location   UserLocation?
+  savedBusinesses SavedBusiness[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -122,11 +123,28 @@ model Business {
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
   businessHours BusinessHour[]
+  savedByUsers SavedBusiness[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([categoryId])
   @@map("businesses")
+}
+
+model SavedBusiness {
+  id         String   @id @default(uuid())
+  userId     String
+  businessId String
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
+  @@map("saved_businesses")
 }
 
 model BusinessHour {

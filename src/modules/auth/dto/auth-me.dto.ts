@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BusinessStatus, FileType } from '@prisma/client';
 
+import { MeLocationDto } from './location/me-location.dto';
 import { UserDto } from './user.dto';
 
 export enum BusinessVerificationNextAction {
@@ -137,4 +138,7 @@ export class AuthMeDto {
 
   @ApiProperty({ type: BusinessVerificationGateDto, nullable: true })
   verification!: BusinessVerificationGateDto | null;
+
+  @ApiProperty({ type: MeLocationDto, nullable: true })
+  location!: MeLocationDto | null;
 }

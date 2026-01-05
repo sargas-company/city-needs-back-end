@@ -52,6 +52,22 @@ export class AuthService {
       throw new NotFoundException('User is not synced');
     }
 
+    const location = await this.prisma.userLocation.findUnique({
+      where: { userId: user.id },
+    });
+
+    const locationDto = location
+      ? {
+          lat: location.lat,
+          lng: location.lng,
+          source: location.source,
+          provider: location.provider ?? null,
+          placeId: location.placeId ?? null,
+          formattedAddress: location.formattedAddress ?? null,
+          updatedAt: location.updatedAt.toISOString(),
+        }
+      : null;
+
     const userDto = this.mapToUserDto(user);
 
     const business = user.business
@@ -104,6 +120,7 @@ export class AuthService {
       user: userDto,
       business,
       verification,
+      location: locationDto,
     };
   }
 

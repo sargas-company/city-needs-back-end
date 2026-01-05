@@ -1,11 +1,15 @@
-import { Body, Controller, Get, Param, ParseArrayPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseArrayPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { SkipBusinessVerification } from 'src/common/decorators/skip-business-verification.decorator';
+import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 
 import { BusinessHoursService } from './business-hours.service';
 import { BusinessHoursDayDto } from './dto/business-hours.dto';
 import { UpdateBusinessHoursDto } from './dto/update-business-hours.dto';
 
 @ApiTags('BusinessHours')
+@SkipBusinessVerification()
+@UseGuards(DbUserAuthGuard)
 @Controller('business')
 export class BusinessHoursController {
   constructor(private readonly businessHoursService: BusinessHoursService) {}
