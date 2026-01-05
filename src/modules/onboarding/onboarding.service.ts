@@ -501,9 +501,8 @@ export class OnboardingService {
     });
 
     if (!business) throw new ConflictException('Business is required before verification submit');
-    if (!business.category?.requiresVerification) {
-      throw new ConflictException('Verification is not required for this business category');
-    }
+
+    const requiresVerification = business.category?.requiresVerification === true;
 
     const file = await tx.file.findUnique({
       where: { id: dto.verificationFileId },
@@ -523,6 +522,7 @@ export class OnboardingService {
       },
       select: { id: true, status: true },
     });
+
     if (locked) {
       throw new ConflictException(
         `Verification is locked (${locked.status}). Cannot submit a new verification.`,
@@ -538,10 +538,12 @@ export class OnboardingService {
       },
     });
 
-    await tx.business.update({
-      where: { id: business.id },
-      data: { status: BusinessStatus.PENDING },
-    });
+    if (requiresVerification) {
+      await tx.business.update({
+        where: { id: business.id },
+        data: { status: BusinessStatus.PENDING },
+      });
+    }
 
     await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
   }

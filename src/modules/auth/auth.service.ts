@@ -1,12 +1,13 @@
 // src/modules/auth/auth.service.ts
 import {
-  Injectable,
   BadRequestException,
-  NotFoundException,
+  ConflictException,
   ForbiddenException,
+  Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
-import { Prisma, User, UserRole, UserStatus, BusinessStatus } from '@prisma/client';
+import { BusinessStatus, Prisma, User, UserRole, UserStatus } from '@prisma/client';
 import * as admin from 'firebase-admin';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -194,6 +195,9 @@ export class AuthService {
     const firebaseName = (firebaseUser as any).name ?? null;
     const emailVerifiedFromFirebase = !!firebaseUser.email_verified;
 
+    const normalizedPhone =
+      payload.phone && payload.phone.trim() !== '' ? payload.phone.trim() : null;
+
     const existing = await this.prisma.user.findUnique({
       where: { authExternalId: uid },
     });
@@ -206,10 +210,16 @@ export class AuthService {
 
     if (!existing) {
       this.logger.log(`Creating new user from Firebase uid=${uid}`, AuthService.name);
+
+      if (normalizedPhone) {
+        const phoneOwner = await this.prisma.user.findUnique({ where: { phone: normalizedPhone } });
+        if (phoneOwner) throw new ConflictException('Phone already in use');
+      }
+
       const data: Prisma.UserCreateInput = {
         authExternalId: uid,
         email,
-        phone: payload.phone ?? null,
+        phone: normalizedPhone,
         username: payload.username ?? firebaseName,
         status: UserStatus.ACTIVE,
         emailVerified: emailVerifiedFromFirebase,
@@ -256,8 +266,12 @@ export class AuthService {
       }
     }
 
-    if (existing.phone === null && payload.phone !== undefined) {
-      updateData.phone = payload.phone;
+    if (existing.phone === null && normalizedPhone) {
+      const phoneOwner = await this.prisma.user.findUnique({ where: { phone: normalizedPhone } });
+      if (phoneOwner && phoneOwner.id !== existing.id) {
+        throw new ConflictException('Phone already in use');
+      }
+      updateData.phone = normalizedPhone;
     }
 
     if (emailVerifiedFromFirebase && !existing.emailVerified) {
