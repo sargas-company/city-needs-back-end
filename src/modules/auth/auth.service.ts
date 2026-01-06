@@ -27,6 +27,12 @@ type MeLoadedUser = Prisma.UserGetPayload<{
   };
 }>;
 
+type UserWithAvatar = User & {
+  avatar?: {
+    url: string;
+  } | null;
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -36,6 +42,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
+        avatar: true,
         business: {
           include: {
             address: true,
@@ -335,13 +342,13 @@ export class AuthService {
     return user;
   }
 
-  mapToUserDto(user: User): UserDto {
+  mapToUserDto(user: UserWithAvatar): UserDto {
     return {
       id: user.id,
       email: user.email,
       phone: user.phone,
       username: user.username,
-      avatar: user.avatarId,
+      avatar: user.avatar?.url ?? null,
       role: user.role,
       status: user.status,
       emailVerified: user.emailVerified,
