@@ -111,6 +111,8 @@ model Business {
   description String
   phone       String
   email       String
+  serviceOnSite   Boolean @default(true)
+  serviceInStudio Boolean @default(true)
   addressId   String?        @unique
   address     Address?       @relation("BusinessAddress", fields: [addressId], references: [id])
   logoId      String?        @map("logo") @unique

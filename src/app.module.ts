@@ -12,6 +12,7 @@ import { BusinessVerificationGuard } from './common/guards/business-verification
 import { LogRetentionService } from './common/services/logger/log-retention.service';
 import { FirebaseModule } from './firebase/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BusinessModule } from './modules/business/business.module';
 import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
@@ -53,6 +54,7 @@ import { StorageModule } from './storage/storage.module';
     UploadSessionsModule,
     VerificationFilesModule,
     SavedBusinessesModule,
+    BusinessModule,
   ],
   providers: [
     LogRetentionService,

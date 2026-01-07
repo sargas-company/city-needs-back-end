@@ -68,6 +68,8 @@ CREATE TABLE "businesses" (
     "description" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "serviceOnSite" BOOLEAN NOT NULL DEFAULT true,
+    "serviceInStudio" BOOLEAN NOT NULL DEFAULT true,
     "addressId" TEXT,
     "logo" TEXT,
     "status" "BusinessStatus" NOT NULL DEFAULT 'PENDING',
