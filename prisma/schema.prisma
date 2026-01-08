@@ -60,6 +60,11 @@ enum LocationSource {
   manual
 }
 
+enum BusinessServiceStatus {
+  ACTIVE
+  DISABLED
+}
+
 // MODELS
 
 model User {
@@ -125,12 +130,34 @@ model Business {
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
   businessHours BusinessHour[]
+  services BusinessService[]
   savedByUsers SavedBusiness[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([categoryId])
   @@map("businesses")
+}
+
+model BusinessService {
+  id         String   @id @default(uuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  name       String
+  price      Int
+  duration   Int
+
+  status     BusinessServiceStatus @default(ACTIVE)
+  position   Int                  @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@map("business_services")
 }
 
 model SavedBusiness {

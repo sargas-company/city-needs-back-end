@@ -24,6 +24,9 @@ CREATE TYPE "UploadItemKind" AS ENUM ('LOGO', 'PHOTO', 'DOCUMENT');
 -- CreateEnum
 CREATE TYPE "LocationSource" AS ENUM ('gps', 'manual');
 
+-- CreateEnum
+CREATE TYPE "BusinessServiceStatus" AS ENUM ('ACTIVE', 'DISABLED');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -79,6 +82,21 @@ CREATE TABLE "businesses" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "businesses_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "business_services" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "price" INTEGER NOT NULL,
+    "duration" INTEGER NOT NULL,
+    "status" "BusinessServiceStatus" NOT NULL DEFAULT 'ACTIVE',
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "business_services_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -224,6 +242,12 @@ CREATE UNIQUE INDEX "businesses_logo_key" ON "businesses"("logo");
 CREATE INDEX "businesses_categoryId_idx" ON "businesses"("categoryId");
 
 -- CreateIndex
+CREATE INDEX "business_services_businessId_idx" ON "business_services"("businessId");
+
+-- CreateIndex
+CREATE INDEX "business_services_businessId_status_idx" ON "business_services"("businessId", "status");
+
+-- CreateIndex
 CREATE INDEX "saved_businesses_userId_idx" ON "saved_businesses"("userId");
 
 -- CreateIndex
@@ -288,6 +312,9 @@ ALTER TABLE "businesses" ADD CONSTRAINT "businesses_logo_fkey" FOREIGN KEY ("log
 
 -- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "business_services" ADD CONSTRAINT "business_services_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "saved_businesses" ADD CONSTRAINT "saved_businesses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
