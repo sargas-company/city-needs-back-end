@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BusinessServiceStatus, Prisma, User } from '@prisma/client';
+import { bookingConfig } from 'src/common/config/booking.config';
 
 import { PrismaService } from '../../../prisma/prisma.service';
 import { BusinessService } from '../business.service';
@@ -33,6 +34,12 @@ export class BusinessServicesService {
 
     if (!Number.isInteger(duration) || duration <= 0) {
       throw new BadRequestException('Bad Request: invalid duration');
+    }
+
+    if (duration % bookingConfig.slotStepMinutes !== 0) {
+      throw new BadRequestException(
+        `Service duration must be multiple of ${bookingConfig.slotStepMinutes} minutes`,
+      );
     }
 
     let finalPosition = position;
@@ -103,6 +110,13 @@ export class BusinessServicesService {
       if (!Number.isInteger(data.duration) || data.duration <= 0) {
         throw new BadRequestException('Bad Request: invalid duration');
       }
+
+      if (data.duration % bookingConfig.slotStepMinutes !== 0) {
+        throw new BadRequestException(
+          `Service duration must be multiple of ${bookingConfig.slotStepMinutes} minutes`,
+        );
+      }
+
       updateData.duration = data.duration;
     }
 
