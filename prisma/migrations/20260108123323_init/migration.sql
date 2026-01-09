@@ -13,6 +13,9 @@ CREATE TYPE "BusinessStatus" AS ENUM ('PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTE
 CREATE TYPE "BusinessVerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
 -- CreateEnum
+CREATE TYPE "BookingStatus" AS ENUM ('CONFIRMED', 'CANCELLED');
+
+-- CreateEnum
 CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'BUSINESS_VERIFICATION_DOCUMENT', 'OTHER');
 
 -- CreateEnum
@@ -78,6 +81,7 @@ CREATE TABLE "businesses" (
     "status" "BusinessStatus" NOT NULL DEFAULT 'PENDING',
     "categoryId" TEXT NOT NULL,
     "verificationGraceDeadlineAt" TIMESTAMP(3),
+    "timeZone" TEXT NOT NULL DEFAULT 'America/Regina',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -122,6 +126,33 @@ CREATE TABLE "business_hours" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "business_hours_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bookings" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
+    "endAt" TIMESTAMP(3) NOT NULL,
+    "status" "BookingStatus" NOT NULL DEFAULT 'CONFIRMED',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "bookings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "booking_services" (
+    "id" TEXT NOT NULL,
+    "bookingId" TEXT NOT NULL,
+    "serviceId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "price" INTEGER NOT NULL,
+    "duration" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "booking_services_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -266,6 +297,15 @@ CREATE INDEX "business_hours_weekday_idx" ON "business_hours"("weekday");
 CREATE INDEX "business_hours_businessId_weekday_idx" ON "business_hours"("businessId", "weekday");
 
 -- CreateIndex
+CREATE INDEX "bookings_businessId_startAt_endAt_idx" ON "bookings"("businessId", "startAt", "endAt");
+
+-- CreateIndex
+CREATE INDEX "bookings_userId_idx" ON "bookings"("userId");
+
+-- CreateIndex
+CREATE INDEX "booking_services_bookingId_idx" ON "booking_services"("bookingId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "business_verifications_verificationFileId_key" ON "business_verifications"("verificationFileId");
 
 -- CreateIndex
@@ -324,6 +364,18 @@ ALTER TABLE "saved_businesses" ADD CONSTRAINT "saved_businesses_businessId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "business_hours" ADD CONSTRAINT "business_hours_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "booking_services" ADD CONSTRAINT "booking_services_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "booking_services" ADD CONSTRAINT "booking_services_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "business_services"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "business_verifications" ADD CONSTRAINT "business_verifications_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;

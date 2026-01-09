@@ -17,6 +17,7 @@ import {
 } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { CITIES, City } from 'src/common/config/cities.config';
 import { BusinessHoursService } from 'src/modules/business-hours/business-hours.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -301,6 +302,15 @@ export class OnboardingService {
 
     if (dto.countryCode !== 'CA') throw new BadRequestException('Only CA countryCode is supported');
 
+    if (!(dto.city in CITIES)) {
+      throw new BadRequestException(
+        `Customer city must be one of: ${Object.keys(CITIES).join(', ')}`,
+      );
+    }
+
+    const city = dto.city as City;
+    const { state } = CITIES[city];
+
     if (user.addressId) {
       await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 2 } });
       return;
@@ -310,7 +320,7 @@ export class OnboardingService {
       data: {
         countryCode: dto.countryCode,
         city: dto.city,
-        state: dto.state,
+        state: state,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2 ?? null,
         zip: dto.zip ?? null,
@@ -397,33 +407,99 @@ export class OnboardingService {
   ) {
     const dto = await this.validatePayload(AddressPayloadDto, payload);
 
-    if (dto.countryCode !== 'CA') throw new BadRequestException('Only CA countryCode is supported');
+    if (dto.countryCode !== 'CA') {
+      throw new BadRequestException('Only CA countryCode is supported');
+    }
+
+    if (!(dto.city in CITIES)) {
+      throw new BadRequestException(
+        `Business city must be one of: ${Object.keys(CITIES).join(', ')}`,
+      );
+    }
+
+    const city = dto.city as City;
+    const { timeZone, state } = CITIES[city];
 
     const business = await tx.business.findUnique({
       where: { ownerUserId: user.id },
       select: { id: true, addressId: true },
     });
-    if (!business) throw new ConflictException('Business must exist before business address');
+
+    if (!business) {
+      throw new ConflictException('Business must exist before business address');
+    }
 
     if (business.addressId) {
-      await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { onboardingStep: 3 },
+      });
       return;
     }
 
     const address = await tx.address.create({
       data: {
         countryCode: dto.countryCode,
-        city: dto.city,
-        state: dto.state,
+        city: city,
+        state: state,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2 ?? null,
         zip: dto.zip ?? null,
       },
     });
 
-    await tx.business.update({ where: { id: business.id }, data: { addressId: address.id } });
-    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
+    await tx.business.update({
+      where: { id: business.id },
+      data: {
+        addressId: address.id,
+        timeZone,
+      },
+    });
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: { onboardingStep: 3 },
+    });
   }
+
+  // private async handleBusinessAddress(
+  //   tx: Prisma.TransactionClient,
+  //   user: LoadedUser,
+  //   payload: any,
+  // ) {
+  //   const dto = await this.validatePayload(AddressPayloadDto, payload);
+
+  //   if (dto.countryCode !== 'CA') throw new BadRequestException('Only CA countryCode is supported');
+
+  //   if (!['Saskatoon', 'Regina'].includes(dto.city)) {
+  //     throw new BadRequestException('Business city must be either Saskatoon or Regina');
+  //   }
+
+  //   const business = await tx.business.findUnique({
+  //     where: { ownerUserId: user.id },
+  //     select: { id: true, addressId: true },
+  //   });
+  //   if (!business) throw new ConflictException('Business must exist before business address');
+
+  //   if (business.addressId) {
+  //     await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
+  //     return;
+  //   }
+
+  //   const address = await tx.address.create({
+  //     data: {
+  //       countryCode: dto.countryCode,
+  //       city: dto.city,
+  //       state: dto.state,
+  //       addressLine1: dto.addressLine1,
+  //       addressLine2: dto.addressLine2 ?? null,
+  //       zip: dto.zip ?? null,
+  //     },
+  //   });
+
+  //   await tx.business.update({ where: { id: business.id }, data: { addressId: address.id } });
+  //   await tx.user.update({ where: { id: user.id }, data: { onboardingStep: 3 } });
+  // }
 
   private async handleBusinessFiles(user: User) {
     await this.uploadSessions.commitDraftForOnboarding(user);

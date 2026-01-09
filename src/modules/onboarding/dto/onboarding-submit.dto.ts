@@ -23,9 +23,9 @@ export class AddressPayloadDto {
   @IsString()
   city!: string;
 
-  @ApiProperty()
-  @IsString()
-  state!: string;
+  // @ApiProperty()
+  // @IsString()
+  // state!: string;
 
   @ApiProperty()
   @IsString()

@@ -15,8 +15,8 @@ export class AddressPayloadDto {
   @ApiProperty({ example: 'Toronto' })
   city!: string;
 
-  @ApiProperty({ example: 'ON' })
-  state!: string;
+  // @ApiProperty({ example: 'ON' })
+  // state!: string;
 
   @ApiProperty({ example: '123 Queen St W' })
   addressLine1!: string;

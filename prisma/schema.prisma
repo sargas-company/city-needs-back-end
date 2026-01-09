@@ -33,6 +33,11 @@ enum BusinessVerificationStatus {
   REJECTED
 }
 
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
 enum FileType {
   AVATAR
   BUSINESS_LOGO
@@ -85,6 +90,7 @@ model User {
   business  Business? @relation("UserBusiness")
   categories UserCategory[]
   location   UserLocation?
+  bookings        Booking[]
   savedBusinesses SavedBusiness[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -126,11 +132,13 @@ model Business {
   categoryId  String
   category    Category       @relation("BusinessCategory", fields: [categoryId], references: [id])
   verificationGraceDeadlineAt DateTime?
+  timeZone    String   @default("America/Regina")
   files          File[]           @relation("BusinessFiles")
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
   businessHours BusinessHour[]
   services BusinessService[]
+  bookings   Booking[]
   savedByUsers SavedBusiness[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -151,6 +159,7 @@ model BusinessService {
 
   status     BusinessServiceStatus @default(ACTIVE)
   position   Int                  @default(0)
+  bookingServices BookingService[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -192,6 +201,50 @@ model BusinessHour {
   @@index([weekday])
   @@index([businessId, weekday])
   @@map("business_hours")
+}
+
+model Booking {
+  id         String   @id @default(uuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  startAt    DateTime
+  endAt      DateTime
+
+  status     BookingStatus @default(CONFIRMED)
+
+  services   BookingService[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId, startAt, endAt])
+  @@index([userId])
+  @@map("bookings")
+}
+
+model BookingService {
+  id         String @id @default(uuid())
+
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   BusinessService @relation(fields: [serviceId], references: [id])
+
+  // snapshot
+  name      String
+  price     Int
+  duration  Int
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@map("booking_services")
 }
 
 model BusinessVerification {

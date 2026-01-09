@@ -14,7 +14,6 @@ import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
 
-import { OnboardingSubmitDto } from './dto/onboarding-submit.dto';
 import {
   AddressPayloadDto,
   CategoriesPayloadDto,
@@ -28,7 +27,8 @@ import {
   BusinessVerificationSubmitRequestDto,
   BusinessVerificationSubmitPayloadDto,
   BusinessVerificationSkipRequestDto,
-} from './dto/onboarding-sumit-swagger.dto';
+} from './dto/onboarding-submit-swagger.dto';
+import { OnboardingSubmitDto } from './dto/onboarding-submit.dto';
 import { OnboardingService } from './onboarding.service';
 
 @ApiTags('Onboarding')
