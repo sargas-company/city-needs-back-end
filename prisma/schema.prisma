@@ -34,7 +34,9 @@ enum BusinessVerificationStatus {
 }
 
 enum BookingStatus {
+  PENDING
   CONFIRMED
+  COMPLETED
   CANCELLED
 }
 
@@ -236,7 +238,6 @@ model BookingService {
   serviceId String
   service   BusinessService @relation(fields: [serviceId], references: [id])
 
-  // snapshot
   name      String
   price     Int
   duration  Int
