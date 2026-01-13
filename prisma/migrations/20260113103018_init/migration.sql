@@ -135,7 +135,10 @@ CREATE TABLE "bookings" (
     "userId" TEXT NOT NULL,
     "startAt" TIMESTAMP(3) NOT NULL,
     "endAt" TIMESTAMP(3) NOT NULL,
-    "status" "BookingStatus" NOT NULL DEFAULT 'CONFIRMED',
+    "status" "BookingStatus" NOT NULL DEFAULT 'PENDING',
+    "cancelledAt" TIMESTAMP(3),
+    "cancelledBy" "UserRole",
+    "cancelReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -301,6 +304,9 @@ CREATE INDEX "bookings_businessId_startAt_endAt_idx" ON "bookings"("businessId",
 
 -- CreateIndex
 CREATE INDEX "bookings_userId_idx" ON "bookings"("userId");
+
+-- CreateIndex
+CREATE INDEX "bookings_status_idx" ON "bookings"("status");
 
 -- CreateIndex
 CREATE INDEX "booking_services_bookingId_idx" ON "booking_services"("bookingId");

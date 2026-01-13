@@ -217,7 +217,11 @@ model Booking {
   startAt    DateTime
   endAt      DateTime
 
-  status     BookingStatus @default(CONFIRMED)
+  status     BookingStatus @default(PENDING)
+
+  cancelledAt DateTime?
+  cancelledBy UserRole?
+  cancelReason String?
 
   services   BookingService[]
 
@@ -226,6 +230,7 @@ model Booking {
 
   @@index([businessId, startAt, endAt])
   @@index([userId])
+  @@index([status])
   @@map("bookings")
 }
 

@@ -1,5 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BookingStatus, BusinessStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { BookingStatus, BusinessStatus, UserRole } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { bookingConfig } from 'src/common/config/booking.config';
 import {
@@ -10,7 +16,9 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { BookingResponseDto } from './dto/booking-response.dto';
+import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 
 @Injectable()
 export class BookingService {
@@ -124,6 +132,134 @@ export class BookingService {
       totalDurationMinutes,
       serviceIds,
       createdAt: booking.createdAt.toISOString(),
+    };
+  }
+
+  async cancelBooking(
+    bookingId: string,
+    actor: { userId: string; role: UserRole },
+    dto: CancelBookingDto,
+  ): Promise<BookingResponseDto> {
+    const cancelBeforeMinutes = Number(process.env.BOOKING_CANCEL_MINUTES_BEFORE_START) || 60;
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED || booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException('Booking cannot be cancelled');
+    }
+
+    const nowUtc = DateTime.utc();
+    const startUtc = DateTime.fromJSDate(booking.startAt, { zone: 'utc' });
+
+    if (nowUtc >= startUtc) {
+      throw new BadRequestException('Booking has already started');
+    }
+
+    const cancelDeadline = startUtc.minus({ minutes: cancelBeforeMinutes });
+    if (nowUtc >= cancelDeadline) {
+      throw new BadRequestException(
+        `Booking can be cancelled only ${cancelBeforeMinutes} minutes before start`,
+      );
+    }
+
+    const isUserOwner = booking.userId === actor.userId;
+    const isBusinessOwner =
+      actor.role === 'BUSINESS_OWNER' && booking.business.ownerUserId === actor.userId;
+
+    if (!isUserOwner && !isBusinessOwner) {
+      throw new BadRequestException('You cannot cancel this booking');
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy: actor.role,
+        cancelReason: dto.reason ?? null,
+      },
+    });
+
+    return {
+      id: updated.id,
+      businessId: updated.businessId,
+      userId: updated.userId,
+      status: updated.status,
+      startAt: updated.startAt.toISOString(),
+      endAt: updated.endAt.toISOString(),
+      totalDurationMinutes: Math.round(
+        (updated.endAt.getTime() - updated.startAt.getTime()) / 60000,
+      ),
+      serviceIds: [],
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async updateStatusByOwner(
+    ownerUserId: string,
+    bookingId: string,
+    dto: UpdateBookingStatusDto,
+  ): Promise<BookingResponseDto> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        services: true,
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.business.ownerUserId !== ownerUserId) {
+      throw new ForbiddenException('You do not own this business');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException('Cancelled booking cannot be updated');
+    }
+
+    if (booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException('Completed booking cannot be updated');
+    }
+
+    if (booking.status === BookingStatus.PENDING && dto.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException('Cannot complete booking without confirmation');
+    }
+
+    if (booking.status === BookingStatus.CONFIRMED && dto.status === BookingStatus.PENDING) {
+      throw new BadRequestException('Cannot revert booking status');
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: dto.status,
+      },
+    });
+
+    const totalDurationMinutes = booking.services.reduce((sum, s) => sum + s.duration, 0);
+
+    return {
+      id: updated.id,
+      businessId: updated.businessId,
+      userId: updated.userId,
+      status: updated.status,
+      startAt: updated.startAt.toISOString(),
+      endAt: updated.endAt.toISOString(),
+      totalDurationMinutes,
+      serviceIds: booking.services.map((s) => s.serviceId),
+      createdAt: updated.createdAt.toISOString(),
     };
   }
 }
