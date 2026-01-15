@@ -79,6 +79,8 @@ CREATE TABLE "businesses" (
     "addressId" TEXT,
     "logo" TEXT,
     "status" "BusinessStatus" NOT NULL DEFAULT 'PENDING',
+    "ratingAvg" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "ratingCount" INTEGER NOT NULL DEFAULT 0,
     "categoryId" TEXT NOT NULL,
     "verificationGraceDeadlineAt" TIMESTAMP(3),
     "timeZone" TEXT NOT NULL DEFAULT 'America/Regina',
@@ -143,6 +145,20 @@ CREATE TABLE "bookings" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "bookings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "reviews" (
+    "id" TEXT NOT NULL,
+    "bookingId" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "rating" INTEGER NOT NULL,
+    "comment" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "reviews_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -309,6 +325,18 @@ CREATE INDEX "bookings_userId_idx" ON "bookings"("userId");
 CREATE INDEX "bookings_status_idx" ON "bookings"("status");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "reviews_bookingId_key" ON "reviews"("bookingId");
+
+-- CreateIndex
+CREATE INDEX "reviews_businessId_idx" ON "reviews"("businessId");
+
+-- CreateIndex
+CREATE INDEX "reviews_userId_idx" ON "reviews"("userId");
+
+-- CreateIndex
+CREATE INDEX "reviews_createdAt_id_idx" ON "reviews"("createdAt", "id");
+
+-- CreateIndex
 CREATE INDEX "booking_services_bookingId_idx" ON "booking_services"("bookingId");
 
 -- CreateIndex
@@ -376,6 +404,15 @@ ALTER TABLE "bookings" ADD CONSTRAINT "bookings_businessId_fkey" FOREIGN KEY ("b
 
 -- AddForeignKey
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "booking_services" ADD CONSTRAINT "booking_services_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE CASCADE ON UPDATE CASCADE;

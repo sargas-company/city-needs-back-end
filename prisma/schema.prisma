@@ -90,6 +90,7 @@ model User {
   addressId String? @unique
   address   Address? @relation("UserAddress", fields: [addressId], references: [id])
   business  Business? @relation("UserBusiness")
+  reviews     Review[]
   categories UserCategory[]
   location   UserLocation?
   bookings        Booking[]
@@ -131,6 +132,9 @@ model Business {
   logoId      String?        @map("logo") @unique
   logo        File?          @relation("BusinessLogo", fields: [logoId], references: [id])
   status      BusinessStatus @default(PENDING)
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+  reviews     Review[]
   categoryId  String
   category    Category       @relation("BusinessCategory", fields: [categoryId], references: [id])
   verificationGraceDeadlineAt DateTime?
@@ -224,6 +228,7 @@ model Booking {
   cancelReason String?
 
   services   BookingService[]
+  review     Review?
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -232,6 +237,30 @@ model Booking {
   @@index([userId])
   @@index([status])
   @@map("bookings")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating     Int
+  comment    String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([userId])
+  @@index([createdAt, id])
+  @@map("reviews")
 }
 
 model BookingService {

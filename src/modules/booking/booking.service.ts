@@ -9,6 +9,10 @@ import { BookingStatus, BusinessStatus, UserRole } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { bookingConfig } from 'src/common/config/booking.config';
 import {
+  CursorPaginationQueryDto,
+  CursorPaginationResponseDto,
+} from 'src/common/dto/cursor-pagination.dto';
+import {
   assertInsideWorkInterval,
   getBusinessWorkInterval,
   parseLocalDateTime,
@@ -260,6 +264,69 @@ export class BookingService {
       totalDurationMinutes,
       serviceIds: booking.services.map((s) => s.serviceId),
       createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async getMyBookingsCursor(
+    userId: string,
+    query: CursorPaginationQueryDto,
+    options?: { withoutReview?: boolean },
+  ): Promise<CursorPaginationResponseDto<any>> {
+    const limit = query.limit ?? 10;
+
+    const where: any = {
+      userId,
+      ...(options?.withoutReview && {
+        status: BookingStatus.COMPLETED,
+        review: { is: null },
+      }),
+    };
+
+    const items = await this.prisma.booking.findMany({
+      where,
+      take: limit + 1,
+      ...(query.cursor && {
+        cursor: {
+          id: query.cursor,
+        },
+        skip: 1,
+      }),
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: {
+        review: { select: { id: true } },
+        business: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    const hasNextPage = items.length > limit;
+    const data = hasNextPage ? items.slice(0, limit) : items;
+
+    const nextCursor = hasNextPage ? data[data.length - 1].id : null;
+
+    const totalCount = await this.prisma.booking.count({ where });
+
+    return {
+      data: data.map((b) => ({
+        id: b.id,
+        businessId: b.businessId,
+        businessName: b.business.name,
+        status: b.status,
+        startAt: b.startAt.toISOString(),
+        endAt: b.endAt.toISOString(),
+        createdAt: b.createdAt.toISOString(),
+        hasReview: Boolean(b.review),
+      })),
+      meta: {
+        nextCursor,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage,
+      },
     };
   }
 }
