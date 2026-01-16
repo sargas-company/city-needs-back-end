@@ -6,8 +6,11 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
+  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
@@ -23,10 +26,6 @@ export class AddressPayloadDto {
   @IsString()
   city!: string;
 
-  // @ApiProperty()
-  // @IsString()
-  // state!: string;
-
   @ApiProperty()
   @IsString()
   addressLine1!: string;
@@ -40,6 +39,22 @@ export class AddressPayloadDto {
   @IsOptional()
   @IsString()
   zip?: string;
+
+  @ApiPropertyOptional({
+    example: 50.4452,
+    description: 'Latitude (required for BUSINESS_ADDRESS)',
+  })
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @ApiPropertyOptional({
+    example: -104.6189,
+    description: 'Longitude (required for BUSINESS_ADDRESS)',
+  })
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
 }
 
 export class CategoriesPayloadDto {
@@ -66,6 +81,13 @@ export class BusinessProfilePayloadDto {
   @ApiProperty()
   @IsEmail()
   email!: string;
+
+  @ApiProperty({
+    example: 50,
+  })
+  @IsInt()
+  @Min(0)
+  price!: number;
 
   @ApiProperty()
   @IsString()

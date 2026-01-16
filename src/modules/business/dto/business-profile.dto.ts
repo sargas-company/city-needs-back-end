@@ -12,6 +12,9 @@ export class BusinessProfileDto {
   phone!: string;
 
   @ApiProperty()
+  price!: number;
+
+  @ApiProperty()
   description!: string;
 
   @ApiProperty()

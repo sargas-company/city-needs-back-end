@@ -17,9 +17,6 @@ export class MeLocationDto {
   @ApiPropertyOptional({ nullable: true, example: 'place-id-123' })
   placeId!: string | null;
 
-  @ApiPropertyOptional({ nullable: true, example: '123 Main St, Toronto, ON' })
-  formattedAddress!: string | null;
-
   @ApiProperty({ example: new Date().toISOString() })
   updatedAt!: string;
 }

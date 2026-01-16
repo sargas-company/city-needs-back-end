@@ -5,14 +5,13 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { MeLocationDto } from './dto/location/me-location.dto';
 import { UpdateMyLocationDto } from './dto/location/update-my-location.dto';
 
-type LocationSelect = Prisma.UserLocationGetPayload<{
+type LocationSelect = Prisma.LocationGetPayload<{
   select: {
     lat: true;
     lng: true;
     source: true;
     provider: true;
     placeId: true;
-    formattedAddress: true;
     updatedAt: true;
   };
 }>;
@@ -22,24 +21,22 @@ export class MeLocationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async upsertLocation(userId: string, dto: UpdateMyLocationDto): Promise<MeLocationDto> {
-    const location = await this.prisma.userLocation.upsert({
+    const location = await this.prisma.location.upsert({
       where: { userId },
       create: {
         userId,
         lat: dto.lat,
         lng: dto.lng,
         source: dto.source,
-        provider: dto.provider,
-        placeId: dto.placeId,
-        formattedAddress: dto.formattedAddress,
+        provider: dto.provider ?? null,
+        placeId: dto.placeId ?? null,
       },
       update: {
         lat: dto.lat,
         lng: dto.lng,
         source: dto.source,
-        provider: dto.provider,
-        placeId: dto.placeId,
-        formattedAddress: dto.formattedAddress,
+        provider: dto.provider ?? null,
+        placeId: dto.placeId ?? null,
       },
       select: {
         lat: true,
@@ -47,7 +44,6 @@ export class MeLocationService {
         source: true,
         provider: true,
         placeId: true,
-        formattedAddress: true,
         updatedAt: true,
       },
     });
@@ -56,7 +52,7 @@ export class MeLocationService {
   }
 
   async getLocation(userId: string): Promise<MeLocationDto | null> {
-    const location = await this.prisma.userLocation.findUnique({
+    const location = await this.prisma.location.findUnique({
       where: { userId },
       select: {
         lat: true,
@@ -64,7 +60,6 @@ export class MeLocationService {
         source: true,
         provider: true,
         placeId: true,
-        formattedAddress: true,
         updatedAt: true,
       },
     });
@@ -77,9 +72,8 @@ export class MeLocationService {
       lat: location.lat,
       lng: location.lng,
       source: location.source,
-      provider: location.provider,
-      placeId: location.placeId,
-      formattedAddress: location.formattedAddress,
+      provider: location.provider ?? null,
+      placeId: location.placeId ?? null,
       updatedAt: location.updatedAt.toISOString(),
     };
   }

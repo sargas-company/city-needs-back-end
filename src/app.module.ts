@@ -17,6 +17,7 @@ import { BookingModule } from './modules/booking/booking.module';
 import { BusinessModule } from './modules/business/business.module';
 import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { LocationsModule } from './modules/locations/locations.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { ReviewModule } from './modules/review/review.module';
 import { SavedBusinessesModule } from './modules/saved-businesses/saved-businesses.module';
@@ -61,6 +62,7 @@ import { StorageModule } from './storage/storage.module';
     AvailabilityModule,
     BookingModule,
     ReviewModule,
+    LocationsModule,
   ],
   providers: [
     LogRetentionService,

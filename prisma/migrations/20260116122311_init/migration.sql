@@ -51,19 +51,19 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "user_locations" (
+CREATE TABLE "locations" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
     "lat" DOUBLE PRECISION NOT NULL,
     "lng" DOUBLE PRECISION NOT NULL,
     "source" "LocationSource" NOT NULL,
     "provider" TEXT,
     "placeId" TEXT,
-    "formattedAddress" TEXT,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT,
+    "businessId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "user_locations_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "locations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -74,6 +74,7 @@ CREATE TABLE "businesses" (
     "description" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "price" INTEGER NOT NULL,
     "serviceOnSite" BOOLEAN NOT NULL DEFAULT true,
     "serviceInStudio" BOOLEAN NOT NULL DEFAULT true,
     "addressId" TEXT,
@@ -277,7 +278,10 @@ CREATE UNIQUE INDEX "users_avatar_key" ON "users"("avatar");
 CREATE UNIQUE INDEX "users_addressId_key" ON "users"("addressId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_locations_userId_key" ON "user_locations"("userId");
+CREATE UNIQUE INDEX "locations_userId_key" ON "locations"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "locations_businessId_key" ON "locations"("businessId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "businesses_ownerUserId_key" ON "businesses"("ownerUserId");
@@ -373,7 +377,10 @@ ALTER TABLE "users" ADD CONSTRAINT "users_avatar_fkey" FOREIGN KEY ("avatar") RE
 ALTER TABLE "users" ADD CONSTRAINT "users_addressId_fkey" FOREIGN KEY ("addressId") REFERENCES "addresses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_locations" ADD CONSTRAINT "user_locations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "locations" ADD CONSTRAINT "locations_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "locations" ADD CONSTRAINT "locations_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "businesses" ADD CONSTRAINT "businesses_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

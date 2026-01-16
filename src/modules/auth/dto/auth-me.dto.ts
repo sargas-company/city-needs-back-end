@@ -84,6 +84,9 @@ export class BusinessDto {
   @ApiProperty()
   email!: string;
 
+  @ApiProperty()
+  price!: number;
+
   @ApiProperty({ enum: BusinessStatus })
   status!: BusinessStatus;
 
@@ -98,6 +101,9 @@ export class BusinessDto {
 
   @ApiProperty({ type: AddressDto, nullable: true })
   address!: AddressDto | null;
+
+  @ApiProperty({ type: MeLocationDto, nullable: true })
+  location!: MeLocationDto | null;
 
   @ApiProperty({ nullable: true })
   logoId!: string | null;

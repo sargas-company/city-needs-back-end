@@ -123,7 +123,7 @@ export class BusinessService {
 
     const business = await this.getBusinessOrThrow(user);
 
-    const { name, phone, description, serviceOnSite, serviceInStudio, businessHours } = dto;
+    const { name, phone, description, serviceOnSite, serviceInStudio, price, businessHours } = dto;
 
     const updateData: Prisma.BusinessUpdateInput = {};
 
@@ -132,6 +132,7 @@ export class BusinessService {
     if (description !== undefined) updateData.description = description;
     if (serviceOnSite !== undefined) updateData.serviceOnSite = serviceOnSite;
     if (serviceInStudio !== undefined) updateData.serviceInStudio = serviceInStudio;
+    if (price !== undefined) updateData.price = price;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedBusiness = await tx.business.update({
@@ -150,6 +151,7 @@ export class BusinessService {
       id: updated.id,
       name: updated.name,
       phone: updated.phone,
+      price: updated.price,
       description: updated.description,
       serviceOnSite: updated.serviceOnSite,
       serviceInStudio: updated.serviceInStudio,

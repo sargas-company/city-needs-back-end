@@ -22,6 +22,7 @@ type MeLoadedUser = Prisma.UserGetPayload<{
         address: true;
         logo: true;
         category: true;
+        location: true;
       };
     };
   };
@@ -47,9 +48,8 @@ export class AuthService {
           include: {
             address: true,
             logo: true,
-            // We need requiresVerification/gracePeriodHours for gate computation,
-            // but we will NOT expose them in BusinessDto.category
             category: true,
+            location: true,
           },
         },
       },
@@ -59,7 +59,7 @@ export class AuthService {
       throw new NotFoundException('User is not synced');
     }
 
-    const location = await this.prisma.userLocation.findUnique({
+    const location = await this.prisma.location.findUnique({
       where: { userId: user.id },
     });
 
@@ -70,7 +70,6 @@ export class AuthService {
           source: location.source,
           provider: location.provider ?? null,
           placeId: location.placeId ?? null,
-          formattedAddress: location.formattedAddress ?? null,
           updatedAt: location.updatedAt.toISOString(),
         }
       : null;
@@ -84,6 +83,7 @@ export class AuthService {
           description: user.business.description,
           phone: user.business.phone,
           email: user.business.email,
+          price: user.business.price,
           status: user.business.status,
           categoryId: user.business.categoryId,
           verificationGraceDeadlineAt: user.business.verificationGraceDeadlineAt,
@@ -116,6 +116,16 @@ export class AuthService {
                 title: user.business.category.title,
                 slug: user.business.category.slug,
                 description: user.business.category.description ?? null,
+              }
+            : null,
+          location: user.business.location
+            ? {
+                lat: user.business.location.lat,
+                lng: user.business.location.lng,
+                source: user.business.location.source,
+                provider: user.business.location.provider ?? null,
+                placeId: user.business.location.placeId ?? null,
+                updatedAt: user.business.location.updatedAt.toISOString(),
               }
             : null,
         }

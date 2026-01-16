@@ -92,7 +92,7 @@ model User {
   business  Business? @relation("UserBusiness")
   reviews     Review[]
   categories UserCategory[]
-  location   UserLocation?
+  location   Location?
   bookings        Booking[]
   savedBusinesses SavedBusiness[]
   createdAt      DateTime    @default(now())
@@ -101,20 +101,26 @@ model User {
   @@map("users")
 }
 
-model UserLocation {
-  id               String         @id @default(cuid())
-  userId           String         @unique
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lat              Float
-  lng              Float
-  source           LocationSource
-  provider         String?
-  placeId          String?
-  formattedAddress String?
-  updatedAt        DateTime       @updatedAt
-  createdAt        DateTime       @default(now())
+model Location {
+  id        String   @id @default(uuid())
 
-  @@map("user_locations")
+  lat       Float
+  lng       Float
+
+  source    LocationSource
+  provider  String?
+  placeId   String?
+
+  userId     String? @unique
+  user       User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId String? @unique
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("locations")
 }
 
 model Business {
@@ -125,6 +131,7 @@ model Business {
   description String
   phone       String
   email       String
+  price       Int
   serviceOnSite   Boolean @default(true)
   serviceInStudio Boolean @default(true)
   addressId   String?        @unique
@@ -140,6 +147,7 @@ model Business {
   verificationGraceDeadlineAt DateTime?
   timeZone    String   @default("America/Regina")
   files          File[]           @relation("BusinessFiles")
+  location Location?
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
   businessHours BusinessHour[]

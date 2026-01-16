@@ -1,7 +1,16 @@
 // src/modules/business/dto/update-business-profile.dto.ts
+
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { UpdateBusinessHoursDto } from 'src/modules/business-hours/dto/update-business-hours.dto';
 
 export class UpdateBusinessProfileDto {
@@ -29,6 +38,15 @@ export class UpdateBusinessProfileDto {
   @IsOptional()
   @IsBoolean()
   serviceInStudio?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Average service price per hour',
+    example: 80,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  price?: number;
 
   @ApiPropertyOptional({ type: [UpdateBusinessHoursDto] })
   @IsOptional()
