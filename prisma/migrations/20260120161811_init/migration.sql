@@ -284,6 +284,12 @@ CREATE UNIQUE INDEX "locations_userId_key" ON "locations"("userId");
 CREATE UNIQUE INDEX "locations_businessId_key" ON "locations"("businessId");
 
 -- CreateIndex
+CREATE INDEX "locations_businessId_idx" ON "locations"("businessId");
+
+-- CreateIndex
+CREATE INDEX "locations_lat_lng_idx" ON "locations"("lat", "lng");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "businesses_ownerUserId_key" ON "businesses"("ownerUserId");
 
 -- CreateIndex
@@ -296,10 +302,22 @@ CREATE UNIQUE INDEX "businesses_logo_key" ON "businesses"("logo");
 CREATE INDEX "businesses_categoryId_idx" ON "businesses"("categoryId");
 
 -- CreateIndex
+CREATE INDEX "businesses_status_categoryId_idx" ON "businesses"("status", "categoryId");
+
+-- CreateIndex
+CREATE INDEX "businesses_status_idx" ON "businesses"("status");
+
+-- CreateIndex
 CREATE INDEX "business_services_businessId_idx" ON "business_services"("businessId");
 
 -- CreateIndex
 CREATE INDEX "business_services_businessId_status_idx" ON "business_services"("businessId", "status");
+
+-- CreateIndex
+CREATE INDEX "business_services_businessId_status_price_idx" ON "business_services"("businessId", "status", "price");
+
+-- CreateIndex
+CREATE INDEX "business_services_price_idx" ON "business_services"("price");
 
 -- CreateIndex
 CREATE INDEX "saved_businesses_userId_idx" ON "saved_businesses"("userId");
@@ -329,6 +347,9 @@ CREATE INDEX "bookings_userId_idx" ON "bookings"("userId");
 CREATE INDEX "bookings_status_idx" ON "bookings"("status");
 
 -- CreateIndex
+CREATE INDEX "bookings_businessId_status_createdAt_idx" ON "bookings"("businessId", "status", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "reviews_bookingId_key" ON "reviews"("bookingId");
 
 -- CreateIndex
@@ -348,6 +369,9 @@ CREATE UNIQUE INDEX "business_verifications_verificationFileId_key" ON "business
 
 -- CreateIndex
 CREATE INDEX "business_verifications_businessId_status_idx" ON "business_verifications"("businessId", "status");
+
+-- CreateIndex
+CREATE INDEX "addresses_city_idx" ON "addresses"("city");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_title_key" ON "categories"("title");

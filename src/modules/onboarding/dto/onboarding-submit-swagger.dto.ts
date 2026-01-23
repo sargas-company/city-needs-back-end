@@ -26,6 +26,12 @@ export class AddressPayloadDto {
 
   @ApiPropertyOptional({ nullable: true, example: 'M5H 2M9' })
   zip?: string | null;
+
+  @ApiPropertyOptional({ example: 50, description: 'REQUIRED for BUSINESS' })
+  lat?: number;
+
+  @ApiPropertyOptional({ example: 50, description: 'REQUIRED for BUSINESS' })
+  lng?: number;
 }
 
 export class CategoriesPayloadDto {
@@ -48,6 +54,9 @@ export class BusinessProfilePayloadDto {
 
   @ApiProperty({ example: 'cat_id_1' })
   categoryId!: string;
+
+  @ApiProperty({ example: 50 })
+  price!: number;
 
   @ApiPropertyOptional({ type: [UpdateBusinessHoursDto] })
   businessHours?: UpdateBusinessHoursDto[];

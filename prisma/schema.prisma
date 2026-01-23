@@ -120,6 +120,8 @@ model Location {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([businessId])
+  @@index([lat, lng])
   @@map("locations")
 }
 
@@ -158,6 +160,8 @@ model Business {
   updatedAt   DateTime       @updatedAt
 
   @@index([categoryId])
+  @@index([status, categoryId])
+  @@index([status])
   @@map("businesses")
 }
 
@@ -180,6 +184,8 @@ model BusinessService {
 
   @@index([businessId])
   @@index([businessId, status])
+  @@index([businessId, status, price])
+  @@index([price])
   @@map("business_services")
 }
 
@@ -244,6 +250,7 @@ model Booking {
   @@index([businessId, startAt, endAt])
   @@index([userId])
   @@index([status])
+  @@index([businessId, status, createdAt])
   @@map("bookings")
 }
 
@@ -318,6 +325,8 @@ model Address {
   zip          String?
   user     User?     @relation("UserAddress")
   business Business? @relation("BusinessAddress")
+
+  @@index([city])
   @@map("addresses")
 }
 
