@@ -21,6 +21,9 @@ export type NormalizedBusinessesQuery = {
   lng?: number;
   radiusMeters?: 1000 | 5000;
 
+  availabilityDate?: string;
+  availabilityTime?: string;
+
   limit: number;
   cursor?: string;
 };
@@ -66,6 +69,19 @@ export function normalizeBusinessesQuery(query: GetBusinessesQueryDto): Normaliz
   const search =
     typeof query.search === 'string' && query.search.trim().length > 0
       ? query.search.trim()
+      : undefined;
+
+  // -----------------------------------------
+  // Normalize availability
+  // -----------------------------------------
+  const availabilityDate =
+    typeof query.availabilityDate === 'string' && query.availabilityDate.trim().length > 0
+      ? query.availabilityDate.trim()
+      : undefined;
+
+  const availabilityTime =
+    typeof query.availabilityTime === 'string' && query.availabilityTime.trim().length > 0
+      ? query.availabilityTime.trim()
       : undefined;
 
   // -----------------------------------------
@@ -123,6 +139,9 @@ export function normalizeBusinessesQuery(query: GetBusinessesQueryDto): Normaliz
     lng,
 
     radiusMeters,
+
+    availabilityDate,
+    availabilityTime,
 
     limit,
     cursor,

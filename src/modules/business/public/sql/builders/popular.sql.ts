@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 
 import { SqlBuilderResult } from './types';
 import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-query';
+import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
@@ -65,6 +66,7 @@ export function buildPopularBusinessesSql(
         ${buildBaseBusinessFiltersSql(query)}
         ${openNow ? buildOpenNowSql('b') : Prisma.empty}
         ${buildServiceSearchSql(query, 'b')}
+        ${buildAvailabilitySql(query, 'b')}
         ${needsDistance ? Prisma.sql`AND ${distanceSql} <= ${radiusMeters}` : Prisma.empty}
     ) sub
 

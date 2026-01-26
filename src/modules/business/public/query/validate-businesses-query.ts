@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { bookingConfig } from 'src/common/config/booking.config';
 
 import { NormalizedBusinessesQuery } from './normalize-businesses-query';
 import { BusinessSort } from '../dto/business-sort.enum';
@@ -23,6 +24,8 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
     radiusMeters,
     openNow,
     cursor,
+    availabilityDate,
+    availabilityTime,
 
     hasExplicitSort,
     hasBestPrice,
@@ -105,7 +108,53 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
   }
 
   // =====================================================
-  // 5. Cursor basic validation
+  // 5. availability
+  // =====================================================
+  if (availabilityDate || availabilityTime) {
+    if (availabilityTime && !availabilityDate) {
+      throw new BadRequestException('availabilityTime requires availabilityDate');
+    }
+
+    if (availabilityDate && !search) {
+      throw new BadRequestException('availabilityDate requires search parameter');
+    }
+
+    if (availabilityDate && openNow) {
+      throw new BadRequestException('availability cannot be combined with openNow');
+    }
+
+    if (availabilityDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(availabilityDate)) {
+        throw new BadRequestException('availabilityDate must be in YYYY-MM-DD format');
+      }
+    }
+
+    if (availabilityTime) {
+      if (!/^\d{2}:\d{2}$/.test(availabilityTime)) {
+        throw new BadRequestException('availabilityTime must be in HH:mm format');
+      }
+
+      const [hoursStr, minutesStr] = availabilityTime.split(':');
+      const hours = Number(hoursStr);
+      const minutes = Number(minutesStr);
+
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        throw new BadRequestException('availabilityTime is out of range');
+      }
+
+      const totalMinutes = hours * 60 + minutes;
+      const step = bookingConfig.slotStepMinutes;
+
+      if (totalMinutes % step !== 0) {
+        throw new BadRequestException(
+          `availabilityTime must be aligned to slot step (${step} minutes)`,
+        );
+      }
+    }
+  }
+
+  // =====================================================
+  // 6. Cursor basic validation
   // =====================================================
 
   if (cursor !== undefined) {

@@ -136,4 +136,23 @@ export class GetBusinessesQueryDto extends CursorPaginationQueryDto {
   @Type(() => Boolean)
   @IsBoolean()
   topRated?: boolean;
+
+  // ------------------------------------------------------------
+  // AVAILABILITY
+  // ------------------------------------------------------------
+  @ApiPropertyOptional({
+    description: 'Availability date in business timezone (YYYY-MM-DD)',
+    example: '2026-02-10',
+  })
+  @IsOptional()
+  @IsString()
+  availabilityDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Availability time in business timezone (HH:mm)',
+    example: '14:30',
+  })
+  @IsOptional()
+  @IsString()
+  availabilityTime?: string;
 }

@@ -18,6 +18,8 @@ export function hashBusinessFilters(query: NormalizedBusinessesQuery): string {
     lat: query.lat,
     lng: query.lng,
     radiusMeters: query.radiusMeters,
+    availabilityDate: query.availabilityDate,
+    availabilityTime: query.availabilityTime,
   };
 
   return crypto.createHash('sha256').update(JSON.stringify(filterPayload)).digest('hex');
