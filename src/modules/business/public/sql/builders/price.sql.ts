@@ -33,7 +33,7 @@ export function buildPriceBusinessesSql(
   const { limit, openNow, sort, lat, lng, radiusMeters } = query;
 
   const isAsc = sort === BusinessSort.PRICE_ASC;
-  const priceSelect = isAsc ? Prisma.sql`MIN(s.price)` : Prisma.sql`MAX(s.price)`;
+  const priceSelect = Prisma.sql`MIN(s.price)`;
 
   const needsDistance = radiusMeters !== undefined;
   const distanceSql =
@@ -75,8 +75,11 @@ export function buildPriceBusinessesSql(
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}
         ${openNow ? buildOpenNowSql('b') : Prisma.empty}
-        ${buildServiceSearchSql(query, 'b')}
-        ${buildAvailabilitySql(query, 'b')}
+        ${
+          query.availabilityDate
+            ? buildAvailabilitySql(query, 'b')
+            : buildServiceSearchSql(query, 'b')
+        }
 
       GROUP BY b.id
     ) sub

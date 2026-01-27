@@ -65,8 +65,11 @@ export function buildPopularBusinessesSql(
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}
         ${openNow ? buildOpenNowSql('b') : Prisma.empty}
-        ${buildServiceSearchSql(query, 'b')}
-        ${buildAvailabilitySql(query, 'b')}
+        ${
+          query.availabilityDate
+            ? buildAvailabilitySql(query, 'b')
+            : buildServiceSearchSql(query, 'b')
+        }
         ${needsDistance ? Prisma.sql`AND ${distanceSql} <= ${radiusMeters}` : Prisma.empty}
     ) sub
 

@@ -78,7 +78,12 @@ export function buildBusinessesCountSql(query: NormalizedBusinessesQuery): Prism
     WHERE b.status = 'ACTIVE'
       ${buildBaseBusinessFiltersSql(query)}
       ${openNow ? buildOpenNowSql('b') : Prisma.empty}
-      ${buildServiceSearchSql(query, 'b')}
-      ${buildAvailabilitySql(query, 'b')}
+      ${buildServiceFilterSql(query, 'b')}
   `;
+}
+
+function buildServiceFilterSql(query: NormalizedBusinessesQuery, alias = 'b'): Prisma.Sql {
+  return query.availabilityDate
+    ? buildAvailabilitySql(query, alias)
+    : buildServiceSearchSql(query, alias);
 }
