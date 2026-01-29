@@ -11,22 +11,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     super({
       adapter,
-      log: ['query', 'error', 'warn'],
+      // log: ['query', 'error', 'warn'],
     });
 
-    // 👇 принудительно кастуем this
-    (this as any).$on('query', (e: any) => {
-      console.log('🟦 PRISMA QUERY');
-      console.log(e.query);
-      console.log('🟨 PARAMS');
-      console.log(e.params);
-      console.log('🕒 DURATION:', e.duration, 'ms');
-      console.log('---------------------------');
-    });
+    // (this as any).$on('query', (e: any) => {
+    //   console.log('🟦 PRISMA QUERY');
+    //   console.log(e.query);
+    //   console.log('🟨 PARAMS');
+    //   console.log(e.params);
+    //   console.log('🕒 DURATION:', e.duration, 'ms');
+    //   console.log('---------------------------');
+    // });
 
-    (this as any).$on('error', (e: any) => {
-      console.error('🔴 PRISMA ERROR', e);
-    });
+    // (this as any).$on('error', (e: any) => {
+    //   console.error('🔴 PRISMA ERROR', e);
+    // });
   }
 
   async onModuleInit() {

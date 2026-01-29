@@ -133,11 +133,48 @@ export class AuthService {
 
     const verification = this.computeBusinessVerificationGate(user);
 
+    let billingSubscription: AuthMeDto['billingSubscription'] = null;
+
+    if (user.role === UserRole.BUSINESS_OWNER && user.business) {
+      const sub = await this.prisma.billingSubscription.findFirst({
+        where: {
+          businessId: user.business.id,
+          status: {
+            in: ['ACTIVE', 'TRIALING', 'PAST_DUE', 'UNPAID'],
+          },
+        },
+        include: {
+          price: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      if (sub) {
+        billingSubscription = {
+          id: sub.id,
+          status: sub.status as any,
+          currentPeriodStartAt: sub.currentPeriodStartAt,
+          currentPeriodEndAt: sub.currentPeriodEndAt,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+          price: {
+            id: sub.price.id,
+            amount: sub.price.amount,
+            currency: sub.price.currency,
+            interval: sub.price.interval,
+            intervalCount: sub.price.intervalCount,
+          },
+        };
+      }
+    }
+
     return {
       user: userDto,
       business,
       verification,
       location: locationDto,
+      ...(billingSubscription !== null ? { billingSubscription } : {}),
     };
   }
 

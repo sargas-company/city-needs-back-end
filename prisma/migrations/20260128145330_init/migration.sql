@@ -30,6 +30,15 @@ CREATE TYPE "LocationSource" AS ENUM ('gps', 'manual');
 -- CreateEnum
 CREATE TYPE "BusinessServiceStatus" AS ENUM ('ACTIVE', 'DISABLED');
 
+-- CreateEnum
+CREATE TYPE "BillingSubscriptionStatus" AS ENUM ('INCOMPLETE', 'INCOMPLETE_EXPIRED', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'UNPAID', 'CANCELED');
+
+-- CreateEnum
+CREATE TYPE "BillingInvoiceStatus" AS ENUM ('DRAFT', 'OPEN', 'PAID', 'VOID', 'UNCOLLECTIBLE');
+
+-- CreateEnum
+CREATE TYPE "BillingProductKind" AS ENUM ('SUBSCRIPTION');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -262,6 +271,98 @@ CREATE TABLE "upload_session_items" (
     CONSTRAINT "upload_session_items_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "billing_customers" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "stripeCustomerId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "billing_customers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "billing_products" (
+    "id" TEXT NOT NULL,
+    "stripeProductId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "kind" "BillingProductKind" NOT NULL DEFAULT 'SUBSCRIPTION',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "billing_products_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "billing_prices" (
+    "id" TEXT NOT NULL,
+    "stripePriceId" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "nickname" TEXT,
+    "amount" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'CAD',
+    "interval" TEXT NOT NULL,
+    "intervalCount" INTEGER NOT NULL DEFAULT 1,
+    "taxInclusive" BOOLEAN NOT NULL DEFAULT false,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "billing_prices_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "billing_subscriptions" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "stripeSubscriptionId" TEXT NOT NULL,
+    "stripeCustomerId" TEXT NOT NULL,
+    "priceId" TEXT NOT NULL,
+    "status" "BillingSubscriptionStatus" NOT NULL,
+    "currentPeriodStartAt" TIMESTAMP(3) NOT NULL,
+    "currentPeriodEndAt" TIMESTAMP(3) NOT NULL,
+    "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "billing_subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "billing_invoices" (
+    "id" TEXT NOT NULL,
+    "stripeInvoiceId" TEXT NOT NULL,
+    "subscriptionId" TEXT,
+    "amountDue" INTEGER NOT NULL,
+    "amountPaid" INTEGER NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'CAD',
+    "status" "BillingInvoiceStatus" NOT NULL,
+    "hostedInvoiceUrl" TEXT,
+    "invoicePdfUrl" TEXT,
+    "issuedAt" TIMESTAMP(3) NOT NULL,
+    "paidAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "billing_invoices_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "stripe_webhook_events" (
+    "id" TEXT NOT NULL,
+    "stripeEventId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "processed" BOOLEAN NOT NULL DEFAULT false,
+    "processedAt" TIMESTAMP(3),
+    "payload" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "stripe_webhook_events_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_authExternalId_key" ON "users"("authExternalId");
 
@@ -394,6 +495,42 @@ CREATE INDEX "upload_session_items_fileId_idx" ON "upload_session_items"("fileId
 -- CreateIndex
 CREATE UNIQUE INDEX "upload_session_items_sessionId_fileId_key" ON "upload_session_items"("sessionId", "fileId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_customers_businessId_key" ON "billing_customers"("businessId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_customers_stripeCustomerId_key" ON "billing_customers"("stripeCustomerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_products_stripeProductId_key" ON "billing_products"("stripeProductId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_prices_stripePriceId_key" ON "billing_prices"("stripePriceId");
+
+-- CreateIndex
+CREATE INDEX "billing_prices_interval_intervalCount_idx" ON "billing_prices"("interval", "intervalCount");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_subscriptions_stripeSubscriptionId_key" ON "billing_subscriptions"("stripeSubscriptionId");
+
+-- CreateIndex
+CREATE INDEX "billing_subscriptions_businessId_idx" ON "billing_subscriptions"("businessId");
+
+-- CreateIndex
+CREATE INDEX "billing_subscriptions_status_idx" ON "billing_subscriptions"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "billing_invoices_stripeInvoiceId_key" ON "billing_invoices"("stripeInvoiceId");
+
+-- CreateIndex
+CREATE INDEX "billing_invoices_status_idx" ON "billing_invoices"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "stripe_webhook_events_stripeEventId_key" ON "stripe_webhook_events"("stripeEventId");
+
+-- CreateIndex
+CREATE INDEX "stripe_webhook_events_type_idx" ON "stripe_webhook_events"("type");
+
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_avatar_fkey" FOREIGN KEY ("avatar") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -474,6 +611,21 @@ ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_sessionI
 
 -- AddForeignKey
 ALTER TABLE "upload_session_items" ADD CONSTRAINT "upload_session_items_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing_customers" ADD CONSTRAINT "billing_customers_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing_prices" ADD CONSTRAINT "billing_prices_productId_fkey" FOREIGN KEY ("productId") REFERENCES "billing_products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing_subscriptions" ADD CONSTRAINT "billing_subscriptions_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing_subscriptions" ADD CONSTRAINT "billing_subscriptions_priceId_fkey" FOREIGN KEY ("priceId") REFERENCES "billing_prices"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing_invoices" ADD CONSTRAINT "billing_invoices_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "billing_subscriptions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 INSERT INTO "categories" (
   "id",

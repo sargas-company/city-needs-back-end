@@ -13,6 +13,7 @@ import { LogRetentionService } from './common/services/logger/log-retention.serv
 import { FirebaseModule } from './firebase/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { BusinessModule } from './modules/business/business.module';
 import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
@@ -63,6 +64,7 @@ import { StorageModule } from './storage/storage.module';
     BookingModule,
     ReviewModule,
     LocationsModule,
+    BillingModule,
   ],
   providers: [
     LogRetentionService,

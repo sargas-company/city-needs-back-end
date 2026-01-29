@@ -2,7 +2,6 @@ import * as process from 'node:process';
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import * as express from 'express';
 
 import { AppModule } from './app.module';
 import { GlobalHttpExceptionFilter } from './common/http/global-http-exception.filter';
@@ -18,7 +17,6 @@ async function bootstrap() {
     logger: appLogger,
   });
 
-  app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
   app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({

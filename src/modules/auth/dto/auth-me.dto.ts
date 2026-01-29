@@ -11,6 +11,16 @@ export enum BusinessVerificationNextAction {
   // RESUBMIT = 'RESUBMIT',
 }
 
+export enum BillingSubscriptionStatus {
+  INCOMPLETE = 'INCOMPLETE',
+  INCOMPLETE_EXPIRED = 'INCOMPLETE_EXPIRED',
+  TRIALING = 'TRIALING',
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  UNPAID = 'UNPAID',
+  CANCELED = 'CANCELED',
+}
+
 export class CategoryPublicDto {
   @ApiProperty()
   id!: string;
@@ -135,6 +145,43 @@ export class BusinessVerificationGateDto {
   nextAction!: BusinessVerificationNextAction;
 }
 
+export class BillingPricePublicDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  amount!: number;
+
+  @ApiProperty()
+  currency!: string;
+
+  @ApiProperty()
+  interval!: string;
+
+  @ApiProperty()
+  intervalCount!: number;
+}
+
+export class BillingSubscriptionPublicDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: BillingSubscriptionStatus })
+  status!: BillingSubscriptionStatus;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  currentPeriodStartAt!: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  currentPeriodEndAt!: Date;
+
+  @ApiProperty()
+  cancelAtPeriodEnd!: boolean;
+
+  @ApiProperty({ type: BillingPricePublicDto })
+  price!: BillingPricePublicDto;
+}
+
 export class AuthMeDto {
   @ApiProperty({ type: UserDto })
   user!: UserDto;
@@ -147,4 +194,11 @@ export class AuthMeDto {
 
   @ApiProperty({ type: MeLocationDto, nullable: true })
   location!: MeLocationDto | null;
+
+  @ApiProperty({
+    type: BillingSubscriptionPublicDto,
+    nullable: true,
+    required: false,
+  })
+  billingSubscription?: BillingSubscriptionPublicDto | null;
 }

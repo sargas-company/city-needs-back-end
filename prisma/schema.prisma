@@ -72,6 +72,28 @@ enum BusinessServiceStatus {
   DISABLED
 }
 
+enum BillingSubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  CANCELED
+}
+
+enum BillingInvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum BillingProductKind {
+  SUBSCRIPTION
+}
+
 // MODELS
 
 model User {
@@ -156,6 +178,8 @@ model Business {
   services BusinessService[]
   bookings   Booking[]
   savedByUsers SavedBusiness[]
+  billingCustomer BillingCustomer?
+  billingSubscriptions BillingSubscription[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -405,4 +429,132 @@ model UploadSessionItem {
   @@index([fileId])
 
   @@map("upload_session_items")
+}
+
+model BillingCustomer {
+  id               String   @id @default(uuid())
+
+  businessId       String   @unique
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  stripeCustomerId String   @unique
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("billing_customers")
+}
+
+model BillingProduct {
+  id              String   @id @default(uuid())
+  stripeProductId String   @unique
+  name            String
+  description     String?
+  active          Boolean  @default(true)
+  prices          BillingPrice[]
+  kind            BillingProductKind @default(SUBSCRIPTION)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("billing_products")
+}
+
+model BillingPrice {
+  id             String   @id @default(uuid())
+
+  stripePriceId  String   @unique
+  productId      String
+  product        BillingProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  nickname       String?
+  amount         Int
+  currency       String   @default("CAD")
+
+  interval       String
+  intervalCount  Int      @default(1)
+
+  taxInclusive   Boolean  @default(false)
+
+  sortOrder      Int      @default(0)
+  active         Boolean  @default(true)
+
+  subscriptions BillingSubscription[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([interval, intervalCount])
+  @@map("billing_prices")
+}
+
+model BillingSubscription {
+  id                   String   @id @default(uuid())
+
+  businessId            String
+  business              Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  stripeSubscriptionId  String   @unique
+  stripeCustomerId      String
+
+  priceId               String
+  price                 BillingPrice @relation(fields: [priceId], references: [id])
+
+  status                BillingSubscriptionStatus
+
+  currentPeriodStartAt  DateTime
+  currentPeriodEndAt    DateTime
+
+  cancelAtPeriodEnd     Boolean  @default(false)
+
+  invoices BillingInvoice[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+  @@map("billing_subscriptions")
+}
+
+model BillingInvoice {
+  id                String   @id @default(uuid())
+
+  stripeInvoiceId   String   @unique
+  subscriptionId    String?
+  subscription      BillingSubscription? @relation(fields: [subscriptionId], references: [id])
+
+  amountDue         Int
+  amountPaid        Int
+  currency          String   @default("CAD")
+
+  status            BillingInvoiceStatus
+
+  hostedInvoiceUrl  String?
+  invoicePdfUrl     String?
+
+  issuedAt          DateTime
+  paidAt            DateTime?
+
+  createdAt         DateTime @default(now())
+
+  @@index([status])
+  @@map("billing_invoices")
+}
+
+model StripeWebhookEvent {
+  id              String   @id @default(uuid())
+
+  stripeEventId   String   @unique
+  type            String
+
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+
+  payload         Json
+
+  createdAt       DateTime @default(now())
+
+  @@index([type])
+  @@map("stripe_webhook_events")
 }
