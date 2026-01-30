@@ -20,6 +20,8 @@ import { BusinessHoursModule } from './modules/business-hours/business-hours.mod
 import { CategoriesModule } from './modules/categories/categories.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { ReelsPublicModule } from './modules/reels/public/reels-public.module';
+import { ReelsModule } from './modules/reels/reels.module';
 import { ReviewModule } from './modules/review/review.module';
 import { SavedBusinessesModule } from './modules/saved-businesses/saved-businesses.module';
 import { StatusModule } from './modules/status/status.module';
@@ -65,6 +67,8 @@ import { StorageModule } from './storage/storage.module';
     ReviewModule,
     LocationsModule,
     BillingModule,
+    ReelsModule,
+    ReelsPublicModule,
   ],
   providers: [
     LogRetentionService,

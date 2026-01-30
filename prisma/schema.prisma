@@ -46,6 +46,7 @@ enum FileType {
   BUSINESS_PHOTO
   BUSINESS_DOCUMENT
   BUSINESS_VERIFICATION_DOCUMENT
+  REEL_VIDEO
   OTHER
 }
 
@@ -170,7 +171,8 @@ model Business {
   category    Category       @relation("BusinessCategory", fields: [categoryId], references: [id])
   verificationGraceDeadlineAt DateTime?
   timeZone    String   @default("America/Regina")
-  files          File[]           @relation("BusinessFiles")
+  files       File[]   @relation("BusinessFiles")
+  reels       Reel[]
   location Location?
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
@@ -391,6 +393,7 @@ model File {
   userAvatar   User?     @relation("UserAvatar")
   verification BusinessVerification? @relation("VerificationFile")
   sessionItems UploadSessionItem[]
+  reel         Reel?    @relation("ReelVideo")
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -557,4 +560,21 @@ model StripeWebhookEvent {
 
   @@index([type])
   @@map("stripe_webhook_events")
+}
+
+model Reel {
+  id          String   @id @default(uuid())
+
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  videoFileId String   @unique
+  video       File     @relation("ReelVideo", fields: [videoFileId], references: [id], onDelete: Restrict)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([createdAt, id])
+  @@map("reels")
 }

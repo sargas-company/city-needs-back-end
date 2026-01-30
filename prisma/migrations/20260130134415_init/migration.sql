@@ -16,7 +16,7 @@ CREATE TYPE "BusinessVerificationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECT
 CREATE TYPE "BookingStatus" AS ENUM ('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED');
 
 -- CreateEnum
-CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'BUSINESS_VERIFICATION_DOCUMENT', 'OTHER');
+CREATE TYPE "FileType" AS ENUM ('AVATAR', 'BUSINESS_LOGO', 'BUSINESS_PHOTO', 'BUSINESS_DOCUMENT', 'BUSINESS_VERIFICATION_DOCUMENT', 'REEL_VIDEO', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "UploadSessionStatus" AS ENUM ('DRAFT', 'COMMITTED', 'ABORTED', 'EXPIRED');
@@ -363,6 +363,17 @@ CREATE TABLE "stripe_webhook_events" (
     CONSTRAINT "stripe_webhook_events_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "reels" (
+    "id" TEXT NOT NULL,
+    "businessId" TEXT NOT NULL,
+    "videoFileId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "reels_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_authExternalId_key" ON "users"("authExternalId");
 
@@ -531,6 +542,15 @@ CREATE UNIQUE INDEX "stripe_webhook_events_stripeEventId_key" ON "stripe_webhook
 -- CreateIndex
 CREATE INDEX "stripe_webhook_events_type_idx" ON "stripe_webhook_events"("type");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "reels_videoFileId_key" ON "reels"("videoFileId");
+
+-- CreateIndex
+CREATE INDEX "reels_businessId_idx" ON "reels"("businessId");
+
+-- CreateIndex
+CREATE INDEX "reels_createdAt_id_idx" ON "reels"("createdAt", "id");
+
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_avatar_fkey" FOREIGN KEY ("avatar") REFERENCES "files"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -626,6 +646,12 @@ ALTER TABLE "billing_subscriptions" ADD CONSTRAINT "billing_subscriptions_priceI
 
 -- AddForeignKey
 ALTER TABLE "billing_invoices" ADD CONSTRAINT "billing_invoices_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "billing_subscriptions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reels" ADD CONSTRAINT "reels_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reels" ADD CONSTRAINT "reels_videoFileId_fkey" FOREIGN KEY ("videoFileId") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 INSERT INTO "categories" (
   "id",
