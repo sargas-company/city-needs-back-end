@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { BookingStatus, BusinessStatus, UserRole } from '@prisma/client';
+import { BookingStatus, BusinessStatus, User, UserRole } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { bookingConfig } from 'src/common/config/booking.config';
 import {
@@ -15,6 +15,7 @@ import {
 import {
   assertInsideWorkInterval,
   getBusinessWorkInterval,
+  parseLocalDate,
   parseLocalDateTime,
 } from 'src/common/utils/business-time.util';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -22,6 +23,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { BookingResponseDto } from './dto/booking-response.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { GetBusinessBookingsQueryDto } from './dto/get-business-bookings-query.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 
 @Injectable()
@@ -30,11 +32,17 @@ export class BookingService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createBooking(userId: string, dto: CreateBookingDto): Promise<BookingResponseDto> {
+  async createBooking(user: User, dto: CreateBookingDto): Promise<BookingResponseDto> {
     const { businessId, serviceIds, startAt } = dto;
 
     if (!serviceIds?.length) {
       throw new BadRequestException('serviceIds must not be empty');
+    }
+
+    // Check user role - only end users can create bookings
+
+    if (user.role !== UserRole.END_USER) {
+      throw new ForbiddenException('Only end users can create bookings');
     }
 
     const business = await this.prisma.business.findUnique({
@@ -104,7 +112,7 @@ export class BookingService {
       const created = await tx.booking.create({
         data: {
           businessId,
-          userId,
+          userId: user.id,
           startAt: startUtc.toJSDate(),
           endAt: endUtc.toJSDate(),
           status: BookingStatus.PENDING,
@@ -264,6 +272,97 @@ export class BookingService {
       totalDurationMinutes,
       serviceIds: booking.services.map((s) => s.serviceId),
       createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async getBusinessBookingsCursor(
+    ownerUserId: string,
+    query: GetBusinessBookingsQueryDto,
+  ): Promise<CursorPaginationResponseDto<any>> {
+    const business = await this.prisma.business.findUnique({
+      where: { ownerUserId },
+      select: { id: true, timeZone: true },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Business not found');
+    }
+
+    const limit = query.limit ?? 10;
+    const where: any = {
+      businessId: business.id,
+    };
+
+    // Filter by status
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    // Filter by date (local business time)
+    if (query.date) {
+      const localDate = parseLocalDate(query.date, business.timeZone);
+      const dayStart = localDate.startOf('day');
+      const dayEnd = localDate.endOf('day');
+
+      where.startAt = {
+        gte: dayStart.toUTC().toJSDate(),
+        lte: dayEnd.toUTC().toJSDate(),
+      };
+    }
+
+    const items = await this.prisma.booking.findMany({
+      where,
+      take: limit + 1,
+      ...(query.cursor && {
+        cursor: {
+          id: query.cursor,
+        },
+        skip: 1,
+      }),
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            phone: true,
+          },
+        },
+        services: {
+          select: {
+            name: true,
+            price: true,
+          },
+        },
+      },
+    });
+
+    const hasNextPage = items.length > limit;
+    const data = hasNextPage ? items.slice(0, limit) : items;
+
+    const nextCursor = hasNextPage ? data[data.length - 1].id : null;
+
+    const totalCount = await this.prisma.booking.count({ where });
+
+    return {
+      data: data.map((b) => ({
+        id: b.id,
+        userId: b.userId,
+        userName: b.user.username ?? undefined,
+        userPhone: b.user.phone ?? undefined,
+        status: b.status,
+        startAt: b.startAt.toISOString(),
+        endAt: b.endAt.toISOString(),
+        createdAt: b.createdAt.toISOString(),
+        services: b.services.map((s) => s.name),
+        totalPrice: b.services.reduce((sum, s) => sum + s.price, 0),
+      })),
+      meta: {
+        nextCursor,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage,
+      },
     };
   }
 

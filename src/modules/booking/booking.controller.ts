@@ -41,7 +41,7 @@ export class BookingController {
     type: BookingResponseDto,
   })
   async create(@CurrentUser() user: User, @Body() dto: CreateBookingDto) {
-    const booking = await this.bookingService.createBooking(user.id, dto);
+    const booking = await this.bookingService.createBooking(user, dto);
 
     return successResponse({ data: booking }, 201);
   }

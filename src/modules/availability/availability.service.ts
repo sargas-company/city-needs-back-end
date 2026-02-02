@@ -92,7 +92,7 @@ export class AvailabilityService {
     const bookings = await this.prisma.booking.findMany({
       where: {
         businessId,
-        status: BookingStatus.CONFIRMED,
+        status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
         startAt: { lt: workEnd.toUTC().toJSDate() },
         endAt: { gt: effectiveStart.toUTC().toJSDate() },
       },

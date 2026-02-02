@@ -13,9 +13,10 @@ import { BusinessPublicServicesController } from './services/business-public-ser
 import { BusinessServicesController } from './services/business-services.controller';
 import { BusinessServicesService } from './services/business-services.service';
 import { AvailabilityModule } from '../availability/availability.module';
+import { BookingModule } from '../booking/booking.module';
 
 @Module({
-  imports: [FirebaseModule, StorageModule, AvailabilityModule],
+  imports: [FirebaseModule, StorageModule, AvailabilityModule, BookingModule],
   controllers: [
     BusinessController,
     BusinessServicesController,
