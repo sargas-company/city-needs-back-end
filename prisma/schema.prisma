@@ -95,6 +95,23 @@ enum BillingProductKind {
   SUBSCRIPTION
 }
 
+enum AnalyticsEventType {
+  PROFILE_VIEW
+  USER_ACTION
+}
+
+enum AnalyticsActionType {
+  CALL
+  MESSAGE
+  BOOKING
+}
+
+enum AnalyticsSource {
+  SEARCH
+  CATEGORIES
+  REELS
+}
+
 // MODELS
 
 model User {
@@ -118,6 +135,7 @@ model User {
   location   Location?
   bookings        Booking[]
   savedBusinesses SavedBusiness[]
+  analyticsEvents AnalyticsEvent[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -182,6 +200,7 @@ model Business {
   savedByUsers SavedBusiness[]
   billingCustomer BillingCustomer?
   billingSubscriptions BillingSubscription[]
+  analyticsEvents AnalyticsEvent[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -577,4 +596,30 @@ model Reel {
   @@index([businessId])
   @@index([createdAt, id])
   @@map("reels")
+}
+
+model AnalyticsEvent {
+  id String @id @default(uuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  viewerUserId String
+  viewer       User @relation(fields: [viewerUserId], references: [id], onDelete: Cascade)
+
+  type AnalyticsEventType
+
+  actionType AnalyticsActionType?
+
+  source AnalyticsSource
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@index([businessId, type])
+  @@index([businessId, type, createdAt])
+  @@index([businessId, actionType])
+  @@index([businessId, source])
+  @@map("analytics_events")
 }
