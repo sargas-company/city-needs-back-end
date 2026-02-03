@@ -1,13 +1,19 @@
 // src/modules/business/business.service.ts
 import { randomUUID } from 'crypto';
 
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Business, FileType, Prisma, User } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Business, BusinessStatus, FileType, Prisma, User } from '@prisma/client';
 import { BusinessHoursService } from 'src/modules/business-hours/business-hours.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
 
 import { BusinessProfileDto } from './dto/business-profile.dto';
+import { BusinessPublicResponseDto } from './dto/business-public-response.dto';
 import { UpdateBusinessProfileDto } from './dto/update-business-profile.dto';
 
 @Injectable()
@@ -155,6 +161,121 @@ export class BusinessService {
       description: updated.description,
       serviceOnSite: updated.serviceOnSite,
       serviceInStudio: updated.serviceInStudio,
+    };
+  }
+
+  async getActiveBusinessById(businessId: string): Promise<BusinessPublicResponseDto> {
+    const business = await this.prisma.business.findFirst({
+      where: {
+        id: businessId,
+        status: BusinessStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        phone: true,
+        email: true,
+        price: true,
+        serviceOnSite: true,
+        serviceInStudio: true,
+        ratingAvg: true,
+        ratingCount: true,
+        timeZone: true,
+        status: true,
+        createdAt: true,
+
+        address: {
+          select: {
+            countryCode: true,
+            city: true,
+            state: true,
+            addressLine1: true,
+            addressLine2: true,
+            zip: true,
+          },
+        },
+
+        category: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
+
+        logo: {
+          select: {
+            id: true,
+            url: true,
+            type: true,
+          },
+        },
+
+        businessHours: {
+          orderBy: { weekday: 'asc' },
+          select: {
+            weekday: true,
+            startTime: true,
+            endTime: true,
+            isClosed: true,
+            is24h: true,
+          },
+        },
+      },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Business not found or not active');
+    }
+
+    return {
+      id: business.id,
+      name: business.name,
+      description: business.description,
+      phone: business.phone,
+      email: business.email,
+      price: business.price,
+      serviceOnSite: business.serviceOnSite,
+      serviceInStudio: business.serviceInStudio,
+      ratingAvg: business.ratingAvg,
+      ratingCount: business.ratingCount,
+      timeZone: business.timeZone,
+      status: business.status,
+      createdAt: business.createdAt,
+
+      address: business.address
+        ? {
+            countryCode: business.address.countryCode,
+            city: business.address.city,
+            state: business.address.state,
+            addressLine1: business.address.addressLine1,
+            addressLine2: business.address.addressLine2,
+            zip: business.address.zip,
+          }
+        : null,
+
+      category: {
+        id: business.category.id,
+        title: business.category.title,
+        slug: business.category.slug,
+      },
+
+      logo: business.logo
+        ? {
+            id: business.logo.id,
+            url: business.logo.url,
+            type: business.logo.type,
+          }
+        : null,
+
+      businessHours: business.businessHours.map((h) => ({
+        weekday: h.weekday,
+        startTime: h.startTime ? h.startTime.toISOString() : null,
+        endTime: h.endTime ? h.endTime.toISOString() : null,
+        isClosed: h.isClosed,
+        is24h: h.is24h,
+      })),
     };
   }
 }

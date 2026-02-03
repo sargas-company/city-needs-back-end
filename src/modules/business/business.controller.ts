@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Put,
   Query,
@@ -28,7 +29,7 @@ import { successResponse } from 'src/common/utils/response.util';
 
 import { SwaggerUpdateMyBusinessProfile } from './business-profile.swagger';
 import { BusinessService } from './business.service';
-import { SwaggerUpdateMyBusinessLogo } from './business.swagger';
+import { SwaggerGetBusinessById, SwaggerUpdateMyBusinessLogo } from './business.swagger';
 import { BookingService } from '../booking/booking.service';
 import { UpdateBusinessLogoDto } from './dto/update-business-logo.dto';
 import { UpdateBusinessProfileDto } from './dto/update-business-profile.dto';
@@ -83,6 +84,13 @@ export class BusinessController {
   ) {
     const result = await this.bookingService.getBusinessBookingsCursor(user.id, query);
 
+    return successResponse(result);
+  }
+
+  @Get(':id')
+  @SwaggerGetBusinessById()
+  async getBusinessById(@Param('id') id: string) {
+    const result = await this.businessService.getActiveBusinessById(id);
     return successResponse(result);
   }
 }

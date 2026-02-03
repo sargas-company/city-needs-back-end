@@ -1,19 +1,9 @@
 // src/modules/booking/booking.controller.ts
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import {
-  CursorPaginationQueryDto,
-  CursorPaginationResponseDto,
-} from 'src/common/dto/cursor-pagination.dto';
+import { CursorPaginationResponseDto } from 'src/common/dto/cursor-pagination.dto';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 
@@ -22,6 +12,7 @@ import { BookingListItemDto } from './dto/booking-list-item.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { GetMyBookingsQueryDto } from './dto/get-my-bookings-query.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 
 @ApiTags('Booking')
@@ -96,24 +87,14 @@ export class BookingController {
 
   @Get('me')
   @ApiOperation({ summary: 'Get my bookings (cursor pagination)' })
-  @ApiQuery({
-    name: 'withoutReview',
-    required: false,
-    type: Boolean,
-    description: 'Return only completed bookings without reviews',
-  })
   @ApiResponse({
     status: 200,
     description: 'List of user bookings',
     type: CursorPaginationResponseDto<BookingListItemDto>,
   })
-  async getMyBookings(
-    @CurrentUser() user: User,
-    @Query() query: CursorPaginationQueryDto,
-    @Query('withoutReview') withoutReview?: string,
-  ) {
+  async getMyBookings(@CurrentUser() user: User, @Query() query: GetMyBookingsQueryDto) {
     const result = await this.bookingService.getMyBookingsCursor(user.id, query, {
-      withoutReview: withoutReview === 'true',
+      withoutReview: query.withoutReview,
     });
 
     return successResponse(result);
