@@ -11,6 +11,7 @@ export function mapBusinessCard(
     serviceInStudio: boolean;
     logo: { url: string } | null;
     address: { city: string } | null;
+    location: { lat: number; lng: number } | null;
     category: { id: string; title: string; slug: string };
   },
   extra?: {
@@ -23,6 +24,8 @@ export function mapBusinessCard(
     logoUrl: business.logo?.url ?? null,
     price: business.price,
     city: business.address?.city ?? '',
+    lat: business.location?.lat ?? null,
+    lng: business.location?.lng ?? null,
     category: business.category,
     ratingAvg: business.ratingAvg,
     ratingCount: business.ratingCount,

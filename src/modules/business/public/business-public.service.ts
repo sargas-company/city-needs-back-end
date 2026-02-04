@@ -58,6 +58,7 @@ export class BusinessPublicService {
         logo: { select: { url: true } },
         category: { select: { id: true, title: true, slug: true } },
         address: { select: { city: true } },
+        location: { select: { lat: true, lng: true } },
       },
     });
 

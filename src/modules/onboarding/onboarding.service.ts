@@ -513,12 +513,13 @@ export class OnboardingService {
       select: {
         id: true,
         verificationGraceDeadlineAt: true,
-        category: { select: { requiresVerification: true } },
+        category: { select: { requiresVerification: true, gracePeriodHours: true } },
       },
     });
     if (!business) throw new ConflictException('Business is required');
 
     const requiresVerification = business.category?.requiresVerification === true;
+    const gracePeriodHours = business.category?.gracePeriodHours ?? null;
     const deadline = business.verificationGraceDeadlineAt ?? null;
     const graceExpired = !deadline || deadline.getTime() <= Date.now();
 
@@ -526,6 +527,15 @@ export class OnboardingService {
       throw new ConflictException(
         'Cannot skip verification: verification is required and grace period is expired or not provided',
       );
+    }
+
+    const shouldActivate = !requiresVerification || gracePeriodHours !== null;
+
+    if (shouldActivate) {
+      await tx.business.update({
+        where: { id: business.id },
+        data: { status: BusinessStatus.ACTIVE },
+      });
     }
 
     await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
@@ -547,13 +557,14 @@ export class OnboardingService {
       select: {
         id: true,
         status: true,
-        category: { select: { requiresVerification: true } },
+        category: { select: { requiresVerification: true, gracePeriodHours: true } },
       },
     });
 
     if (!business) throw new ConflictException('Business is required before verification submit');
 
     const requiresVerification = business.category?.requiresVerification === true;
+    const gracePeriodHours = business.category?.gracePeriodHours ?? null;
 
     const file = await tx.file.findUnique({
       where: { id: dto.verificationFileId },
@@ -589,12 +600,12 @@ export class OnboardingService {
       },
     });
 
-    if (requiresVerification) {
-      await tx.business.update({
-        where: { id: business.id },
-        data: { status: BusinessStatus.PENDING },
-      });
-    }
+    const shouldBePending = requiresVerification && gracePeriodHours === null;
+
+    await tx.business.update({
+      where: { id: business.id },
+      data: { status: shouldBePending ? BusinessStatus.PENDING : BusinessStatus.ACTIVE },
+    });
 
     await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
   }

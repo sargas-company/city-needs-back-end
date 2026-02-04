@@ -11,6 +11,7 @@ import basicAuth from 'express-basic-auth';
 import { BusinessVerificationGuard } from './common/guards/business-verification.guard';
 import { LogRetentionService } from './common/services/logger/log-retention.service';
 import { FirebaseModule } from './firebase/firebase.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
@@ -71,6 +72,7 @@ import { StorageModule } from './storage/storage.module';
     ReelsModule,
     ReelsPublicModule,
     AnalyticsModule,
+    AdminModule,
   ],
   providers: [
     LogRetentionService,

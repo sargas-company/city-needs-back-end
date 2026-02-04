@@ -6,7 +6,7 @@ import {
 } from 'src/common/dto/cursor-pagination.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 
-import { BusinessCardDto } from './dto/business-card.dto';
+import { SavedBusinessCardDto } from './dto/business-card.dto';
 
 @Injectable()
 export class SavedBusinessesService {
@@ -62,7 +62,7 @@ export class SavedBusinessesService {
   async list(
     userId: string,
     query: CursorPaginationQueryDto,
-  ): Promise<CursorPaginationResponseDto<BusinessCardDto>> {
+  ): Promise<CursorPaginationResponseDto<SavedBusinessCardDto>> {
     const limit = query.limit ? Math.min(query.limit, 50) : 10;
 
     const cursorCondition = query.cursor ? { id: { lt: query.cursor } } : undefined;
@@ -93,7 +93,7 @@ export class SavedBusinessesService {
     const hasNextPage = items.length > limit;
     const sliced = hasNextPage ? items.slice(0, limit) : items;
 
-    const data: BusinessCardDto[] = sliced.map((item) => ({
+    const data: SavedBusinessCardDto[] = sliced.map((item) => ({
       id: item.business.id,
       name: item.business.name,
       city: item.business.address?.city ?? '',

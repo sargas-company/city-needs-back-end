@@ -11,6 +11,11 @@ export function BusinessPublicGetBusinessesSwagger() {
       description: `
 Returns a public list of businesses with filters, sorting and cursor-based pagination.
 
+Response includes:
+- Business details (name, price, city, category, ratings, etc.)
+- Location coordinates (lat, lng) for each business (if available)
+- Distance in meters (if user location is provided)
+
 Pagination:
 - Cursor-based (infinite scroll)
 - No page numbers
