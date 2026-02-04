@@ -3,12 +3,11 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { CursorPaginationResponseDto } from 'src/common/dto/cursor-pagination.dto';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 
 import { BookingService } from './booking.service';
-import { BookingListItemDto } from './dto/booking-list-item.dto';
+import { BookingListResponseDto } from './dto/booking-list-response.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -90,7 +89,7 @@ export class BookingController {
   @ApiResponse({
     status: 200,
     description: 'List of user bookings',
-    type: CursorPaginationResponseDto<BookingListItemDto>,
+    type: BookingListResponseDto,
   })
   async getMyBookings(@CurrentUser() user: User, @Query() query: GetMyBookingsQueryDto) {
     const result = await this.bookingService.getMyBookingsCursor(user.id, query, {

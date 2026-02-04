@@ -399,6 +399,14 @@ export class BookingService {
             name: true,
           },
         },
+        services: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            duration: true,
+          },
+        },
       },
     });
 
@@ -410,16 +418,29 @@ export class BookingService {
     const totalCount = await this.prisma.booking.count({ where });
 
     return {
-      data: data.map((b) => ({
-        id: b.id,
-        businessId: b.businessId,
-        businessName: b.business.name,
-        status: b.status,
-        startAt: b.startAt.toISOString(),
-        endAt: b.endAt.toISOString(),
-        createdAt: b.createdAt.toISOString(),
-        hasReview: Boolean(b.review),
-      })),
+      data: data.map((b) => {
+        const services = b.services.map((s) => ({
+          id: s.id,
+          name: s.name,
+          price: s.price,
+          duration: s.duration,
+        }));
+
+        const totalPrice = services.reduce((sum, s) => sum + s.price, 0);
+
+        return {
+          id: b.id,
+          businessId: b.businessId,
+          businessName: b.business.name,
+          status: b.status,
+          startAt: b.startAt.toISOString(),
+          endAt: b.endAt.toISOString(),
+          createdAt: b.createdAt.toISOString(),
+          hasReview: Boolean(b.review),
+          services,
+          totalPrice,
+        };
+      }),
       meta: {
         nextCursor,
         totalCount,
