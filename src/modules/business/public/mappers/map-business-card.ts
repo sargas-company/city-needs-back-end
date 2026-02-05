@@ -16,6 +16,7 @@ export function mapBusinessCard(
   },
   extra?: {
     distance?: number;
+    isSaved?: boolean;
   },
 ): BusinessCardDto {
   return {
@@ -31,6 +32,7 @@ export function mapBusinessCard(
     ratingCount: business.ratingCount,
     serviceOnSite: business.serviceOnSite,
     serviceInStudio: business.serviceInStudio,
+    isSaved: extra?.isSaved ?? false,
     ...(extra?.distance !== undefined ? { distanceMeters: Math.round(extra.distance) } : {}),
   };
 }

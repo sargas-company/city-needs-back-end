@@ -1,5 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { User } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 
@@ -16,8 +18,8 @@ export class BusinessPublicController {
 
   @Get()
   @BusinessPublicGetBusinessesSwagger()
-  async getBusinesses(@Query() query: GetBusinessesQueryDto) {
-    const result = await this.businessPublicService.getBusinesses(query);
+  async getBusinesses(@CurrentUser() user: User, @Query() query: GetBusinessesQueryDto) {
+    const result = await this.businessPublicService.getBusinesses(query, user.id);
     return successResponse(result);
   }
 }

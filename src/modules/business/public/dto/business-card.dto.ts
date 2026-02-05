@@ -49,4 +49,9 @@ export class BusinessCardDto {
 
   @ApiPropertyOptional({ example: 1250 })
   distanceMeters?: number;
+
+  @ApiProperty({
+    example: false,
+  })
+  isSaved!: boolean;
 }

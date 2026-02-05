@@ -14,11 +14,14 @@ import { executeBusinessesQuery } from './sql/execute-businesses-query';
 export class BusinessPublicService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getBusinesses(rawQuery: GetBusinessesQueryDto): Promise<GetBusinessesResponseDto> {
+  async getBusinesses(
+    rawQuery: GetBusinessesQueryDto,
+    userId?: string,
+  ): Promise<GetBusinessesResponseDto> {
     // ---------------------------------------
     // 1. Normalize + validate
     // ---------------------------------------
-    const query = normalizeBusinessesQuery(rawQuery);
+    const query = normalizeBusinessesQuery(rawQuery, userId);
     validateBusinessesQuery(query);
 
     // ---------------------------------------
@@ -74,6 +77,7 @@ export class BusinessPublicService {
 
         return mapBusinessCard(business, {
           distance: row.distance,
+          isSaved: row.isSaved,
         });
       })
       .filter((item): item is BusinessCardDto => item !== null);

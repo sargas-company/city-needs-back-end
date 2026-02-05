@@ -5,6 +5,7 @@ import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-quer
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
+import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
 import { buildServiceSearchSql } from '../fragments/service-search.sql';
 
@@ -36,11 +37,13 @@ export function buildTopRatedBusinessesSql(
   ratingCount: number;
   distance?: number;
 }> {
-  const { limit, openNow, lat, lng, radiusMeters } = query;
+  const { limit, openNow, lat, lng, radiusMeters, userId } = query;
 
   const needsDistance = radiusMeters !== undefined;
   const distanceSql =
     needsDistance && lat !== undefined && lng !== undefined ? buildDistanceSql(lat, lng) : null;
+
+  const { leftJoin: isSavedJoin, selectExpr: isSavedExpr } = buildIsSavedSql(userId, 'b');
 
   /**
    * Cursor condition (applied on outer query)
@@ -71,13 +74,16 @@ export function buildTopRatedBusinessesSql(
       sub.id,
       sub."ratingAvg",
       sub."ratingCount"
-      ${distanceSql ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty}
+      ${distanceSql ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty},
+      sub."isSaved"
     FROM (
       SELECT
         b.id,
         b."ratingAvg",
-        b."ratingCount"
+        b."ratingCount",
+        ${isSavedExpr} AS "isSaved"
       FROM businesses b
+      ${isSavedJoin}
 
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}

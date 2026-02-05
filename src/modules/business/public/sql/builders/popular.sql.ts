@@ -5,6 +5,7 @@ import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-quer
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
+import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
 import { buildServiceSearchSql } from '../fragments/service-search.sql';
 
@@ -26,13 +27,15 @@ export function buildPopularBusinessesSql(
   id: string;
   popularity: number;
 }> {
-  const { limit, openNow, lat, lng, radiusMeters } = query;
+  const { limit, openNow, lat, lng, radiusMeters, userId } = query;
   const needsDistance = radiusMeters !== undefined;
 
   const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const distanceSql =
     needsDistance && lat !== undefined && lng !== undefined ? buildDistanceSql(lat, lng) : null;
+
+  const { leftJoin: isSavedJoin, selectExpr: isSavedExpr } = buildIsSavedSql(userId, 'b');
 
   const cursorCondition = decodedCursor
     ? Prisma.sql`
@@ -49,18 +52,21 @@ export function buildPopularBusinessesSql(
     SELECT
       sub.id,
       COUNT(sub.booking_id)::int AS popularity
-      ${needsDistance ? Prisma.sql`, sub.distance` : Prisma.empty}
+      ${needsDistance ? Prisma.sql`, sub.distance` : Prisma.empty},
+      sub."isSaved"
     FROM (
       SELECT
         b.id,
         book.id AS booking_id
-        ${needsDistance ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty}
+        ${needsDistance ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty},
+        ${isSavedExpr} AS "isSaved"
       FROM businesses b
       LEFT JOIN bookings book
         ON book."businessId" = b.id
         AND book.status IN ('CONFIRMED', 'COMPLETED')
         AND book."createdAt" >= ${fromDate}
       ${needsDistance ? Prisma.sql`JOIN locations l ON l."businessId" = b.id` : Prisma.empty}
+      ${isSavedJoin}
 
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}
@@ -73,7 +79,7 @@ export function buildPopularBusinessesSql(
         ${needsDistance ? Prisma.sql`AND ${distanceSql} <= ${radiusMeters}` : Prisma.empty}
     ) sub
 
-    GROUP BY sub.id ${needsDistance ? Prisma.sql`, sub.distance` : Prisma.empty}
+    GROUP BY sub.id ${needsDistance ? Prisma.sql`, sub.distance` : Prisma.empty}, sub."isSaved"
     ${cursorCondition}
 
     ORDER BY popularity DESC, sub.id DESC

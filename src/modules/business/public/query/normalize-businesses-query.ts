@@ -26,6 +26,8 @@ export type NormalizedBusinessesQuery = {
 
   limit: number;
   cursor?: string;
+
+  userId?: string;
 };
 
 /**
@@ -38,7 +40,10 @@ export type NormalizedBusinessesQuery = {
  * - DO NOT throw errors
  * - DO NOT validate business rules
  */
-export function normalizeBusinessesQuery(query: GetBusinessesQueryDto): NormalizedBusinessesQuery {
+export function normalizeBusinessesQuery(
+  query: GetBusinessesQueryDto,
+  userId?: string,
+): NormalizedBusinessesQuery {
   const hasExplicitSort = !!query.sort;
   const hasBestPrice = query.bestPrice === true;
   const hasTopRated = query.topRated === true;
@@ -145,5 +150,7 @@ export function normalizeBusinessesQuery(query: GetBusinessesQueryDto): Normaliz
 
     limit,
     cursor,
+
+    userId,
   };
 }

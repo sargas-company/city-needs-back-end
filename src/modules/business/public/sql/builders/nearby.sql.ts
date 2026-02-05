@@ -5,6 +5,7 @@ import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-quer
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
+import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
 import { buildServiceSearchSql } from '../fragments/service-search.sql';
 
@@ -30,13 +31,15 @@ export function buildNearbyBusinessesSql(
   id: string;
   distance: number;
 }> {
-  const { lat, lng, limit, openNow, radiusMeters } = query;
+  const { lat, lng, limit, openNow, radiusMeters, userId } = query;
 
   // lat/lng presence already validated
   const latitude = lat!;
   const longitude = lng!;
 
   const distanceSql = buildDistanceSql(latitude, longitude);
+
+  const { leftJoin: isSavedJoin, selectExpr: isSavedExpr } = buildIsSavedSql(userId, 'b');
 
   /**
    * Optional radius filter (withinKm)
@@ -63,13 +66,16 @@ export function buildNearbyBusinessesSql(
   const sql = Prisma.sql`
     SELECT
       sub.id,
-      sub.distance
+      sub.distance,
+      sub."isSaved"
     FROM (
       SELECT
         b.id,
-        ${distanceSql} AS distance
+        ${distanceSql} AS distance,
+        ${isSavedExpr} AS "isSaved"
       FROM businesses b
       JOIN locations l ON l."businessId" = b.id
+      ${isSavedJoin}
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}
         ${openNow ? buildOpenNowSql('b') : Prisma.empty}

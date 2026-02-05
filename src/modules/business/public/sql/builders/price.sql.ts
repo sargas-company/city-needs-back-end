@@ -6,6 +6,7 @@ import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-quer
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
+import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
 import { buildServiceSearchSql } from '../fragments/service-search.sql';
 
@@ -30,7 +31,7 @@ export function buildPriceBusinessesSql(
   price: number;
   distance?: number;
 }> {
-  const { limit, openNow, sort, lat, lng, radiusMeters } = query;
+  const { limit, openNow, sort, lat, lng, radiusMeters, userId } = query;
 
   const isAsc = sort === BusinessSort.PRICE_ASC;
   const priceSelect = Prisma.sql`MIN(s.price)`;
@@ -38,6 +39,8 @@ export function buildPriceBusinessesSql(
   const needsDistance = radiusMeters !== undefined;
   const distanceSql =
     needsDistance && lat !== undefined && lng !== undefined ? buildDistanceSql(lat, lng) : null;
+
+  const { leftJoin: isSavedJoin, selectExpr: isSavedExpr } = buildIsSavedSql(userId, 'b');
 
   /**
    * Cursor condition (applied on aggregated result)
@@ -62,15 +65,18 @@ export function buildPriceBusinessesSql(
     SELECT
       sub.id,
       sub.price
-      ${distanceSql ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty}
+      ${distanceSql ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty},
+      sub."isSaved"
     FROM (
       SELECT
         b.id,
-        ${priceSelect}::int AS price
+        ${priceSelect}::int AS price,
+        ${isSavedExpr} AS "isSaved"
       FROM businesses b
       JOIN business_services s
         ON s."businessId" = b.id
         AND s.status = 'ACTIVE'
+      ${isSavedJoin}
 
       WHERE b.status = 'ACTIVE'
         ${buildBaseBusinessFiltersSql(query)}
@@ -81,7 +87,7 @@ export function buildPriceBusinessesSql(
             : buildServiceSearchSql(query, 'b')
         }
 
-      GROUP BY b.id
+      GROUP BY b.id, ${isSavedExpr}
     ) sub
     ${distanceSql ? Prisma.sql`JOIN locations l ON l."businessId" = sub.id` : Prisma.empty}
     ${cursorCondition}

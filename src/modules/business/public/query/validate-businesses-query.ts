@@ -98,17 +98,7 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
   }
 
   // =====================================================
-  // 4. openNow constraints
-  // =====================================================
-
-  // openNow must always go through raw SQL path
-  // validator ensures it is not silently ignored
-  if (openNow && !hasExplicitSort && !hasBestPrice && !hasTopRated) {
-    throw new BadRequestException('openNow requires explicit sorting strategy');
-  }
-
-  // =====================================================
-  // 5. availability
+  // 4. availability
   // =====================================================
   if (availabilityDate || availabilityTime) {
     if (availabilityTime && !availabilityDate) {
@@ -154,7 +144,7 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
   }
 
   // =====================================================
-  // 6. Cursor basic validation
+  // 5. Cursor basic validation
   // =====================================================
 
   if (cursor !== undefined) {
