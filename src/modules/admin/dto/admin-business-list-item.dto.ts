@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BusinessStatus } from '@prisma/client';
+import { FileDto } from 'src/modules/auth/dto/auth-me.dto';
 
 export class AdminBusinessOwnerDto {
   @ApiProperty()
@@ -61,6 +62,9 @@ export class AdminBusinessListItemDto {
 
   @ApiProperty({ nullable: true })
   address!: AdminBusinessAddressDto | null;
+
+  @ApiProperty({ type: FileDto, nullable: true })
+  logo!: FileDto | null;
 
   @ApiProperty()
   owner!: AdminBusinessOwnerDto;

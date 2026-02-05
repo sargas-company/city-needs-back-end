@@ -55,9 +55,21 @@ export class ReelsPublicService {
             id: true,
             name: true,
             categoryId: true,
+            ratingAvg: true,
+            ratingCount: true,
             logo: {
               select: {
                 url: true,
+              },
+            },
+            address: {
+              select: {
+                countryCode: true,
+                city: true,
+                state: true,
+                addressLine1: true,
+                addressLine2: true,
+                zip: true,
               },
             },
           },
@@ -84,7 +96,10 @@ export class ReelsPublicService {
           id: r.business.id,
           name: r.business.name,
           categoryId: r.business.categoryId,
+          ratingAvg: r.business.ratingAvg,
+          ratingCount: r.business.ratingCount,
           logoUrl: r.business.logo?.url ?? null,
+          address: r.business.address,
         },
       })),
       nextCursor,
