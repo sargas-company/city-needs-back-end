@@ -59,6 +59,17 @@ export class BusinessPublicHourDto {
   is24h!: boolean;
 }
 
+export class BusinessPublicPhotoDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  url!: string;
+
+  @ApiProperty()
+  type!: string;
+}
+
 export class BusinessPublicResponseDto {
   @ApiProperty()
   id!: string;
@@ -110,4 +121,7 @@ export class BusinessPublicResponseDto {
 
   @ApiProperty({ type: [BusinessPublicHourDto] })
   businessHours!: BusinessPublicHourDto[];
+
+  @ApiProperty({ type: [BusinessPublicPhotoDto] })
+  photos!: BusinessPublicPhotoDto[];
 }

@@ -222,6 +222,17 @@ export class BusinessService {
             is24h: true,
           },
         },
+
+        files: {
+          where: {
+            type: FileType.BUSINESS_PHOTO,
+          },
+          select: {
+            id: true,
+            url: true,
+            type: true,
+          },
+        },
       },
     });
 
@@ -275,6 +286,12 @@ export class BusinessService {
         endTime: h.endTime ? h.endTime.toISOString() : null,
         isClosed: h.isClosed,
         is24h: h.is24h,
+      })),
+
+      photos: business.files.map((file) => ({
+        id: file.id,
+        url: file.url,
+        type: file.type,
       })),
     };
   }

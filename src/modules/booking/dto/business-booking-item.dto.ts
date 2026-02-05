@@ -1,6 +1,7 @@
 // src/modules/booking/dto/business-booking-item.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '@prisma/client';
+import { BookingServiceItemDto } from './booking-service-item.dto';
 
 export class BusinessBookingItemDto {
   @ApiProperty({ example: 'booking-uuid' })
@@ -28,10 +29,10 @@ export class BusinessBookingItemDto {
   createdAt!: string;
 
   @ApiProperty({
-    description: 'List of service names included in this booking',
-    example: ['Haircut', 'Beard Trim'],
+    description: 'List of services included in this booking',
+    type: [BookingServiceItemDto],
   })
-  services!: string[];
+  services!: BookingServiceItemDto[];
 
   @ApiProperty({
     description: 'Total price of all services',

@@ -330,8 +330,10 @@ export class BookingService {
         },
         services: {
           select: {
+            id: true,
             name: true,
             price: true,
+            duration: true,
           },
         },
       },
@@ -354,7 +356,12 @@ export class BookingService {
         startAt: b.startAt.toISOString(),
         endAt: b.endAt.toISOString(),
         createdAt: b.createdAt.toISOString(),
-        services: b.services.map((s) => s.name),
+        services: b.services.map((s) => ({
+          id: s.id,
+          name: s.name,
+          price: s.price,
+          duration: s.duration,
+        })),
         totalPrice: b.services.reduce((sum, s) => sum + s.price, 0),
       })),
       meta: {
