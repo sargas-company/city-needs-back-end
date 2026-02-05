@@ -3,6 +3,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '@prisma/client';
 import { BookingServiceItemDto } from './booking-service-item.dto';
 
+export class UserAvatarDto {
+  @ApiProperty({ example: 'file-uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'https://example.com/avatar.png' })
+  url!: string;
+}
+
 export class BusinessBookingItemDto {
   @ApiProperty({ example: 'booking-uuid' })
   id!: string;
@@ -15,6 +23,9 @@ export class BusinessBookingItemDto {
 
   @ApiPropertyOptional({ example: '+1234567890' })
   userPhone?: string;
+
+  @ApiPropertyOptional({ type: UserAvatarDto, nullable: true })
+  userAvatar?: UserAvatarDto | null;
 
   @ApiProperty({ enum: BookingStatus })
   status!: BookingStatus;

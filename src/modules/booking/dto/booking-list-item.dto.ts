@@ -1,8 +1,16 @@
 // src/modules/booking/dto/booking-list-item.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '@prisma/client';
 
 import { BookingServiceItemDto } from './booking-service-item.dto';
+
+export class BusinessLogoDto {
+  @ApiProperty({ example: 'file-uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'https://example.com/logo.png' })
+  url!: string;
+}
 
 export class BookingListItemDto {
   @ApiProperty({ example: 'booking-uuid' })
@@ -13,6 +21,9 @@ export class BookingListItemDto {
 
   @ApiProperty({ example: 'Joe Barber Shop' })
   businessName!: string;
+
+  @ApiPropertyOptional({ type: BusinessLogoDto, nullable: true })
+  businessLogo!: BusinessLogoDto | null;
 
   @ApiProperty({ enum: BookingStatus })
   status!: BookingStatus;

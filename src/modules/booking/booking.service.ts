@@ -326,6 +326,12 @@ export class BookingService {
             id: true,
             username: true,
             phone: true,
+            avatar: {
+              select: {
+                id: true,
+                url: true,
+              },
+            },
           },
         },
         services: {
@@ -352,6 +358,12 @@ export class BookingService {
         userId: b.userId,
         userName: b.user.username ?? undefined,
         userPhone: b.user.phone ?? undefined,
+        userAvatar: b.user.avatar
+          ? {
+              id: b.user.avatar.id,
+              url: b.user.avatar.url,
+            }
+          : null,
         status: b.status,
         startAt: b.startAt.toISOString(),
         endAt: b.endAt.toISOString(),
@@ -404,6 +416,12 @@ export class BookingService {
           select: {
             id: true,
             name: true,
+            logo: {
+              select: {
+                id: true,
+                url: true,
+              },
+            },
           },
         },
         services: {
@@ -439,6 +457,12 @@ export class BookingService {
           id: b.id,
           businessId: b.businessId,
           businessName: b.business.name,
+          businessLogo: b.business.logo
+            ? {
+                id: b.business.logo.id,
+                url: b.business.logo.url,
+              }
+            : null,
           status: b.status,
           startAt: b.startAt.toISOString(),
           endAt: b.endAt.toISOString(),
