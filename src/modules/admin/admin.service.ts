@@ -7,8 +7,10 @@ import { encodeAdminCursor } from './cursor/encode-admin-cursor';
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
+import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
+import { GetAdminVerificationsQueryDto } from './dto/get-admin-verifications-query.dto';
 
 @Injectable()
 export class AdminService {
@@ -138,6 +140,150 @@ export class AdminService {
     };
   }
 
+  async getVerifications(
+    query: GetAdminVerificationsQueryDto,
+  ): Promise<AdminVerificationsResponseDto> {
+    const limit = query.limit ?? 20;
+
+    // 1. where
+    const where: Prisma.BusinessVerificationWhereInput = {
+      ...(query.status && { status: query.status }),
+
+      ...(query.search && {
+        business: {
+          name: {
+            contains: query.search,
+            mode: 'insensitive',
+          },
+        },
+      }),
+
+      ...(query.city && {
+        business: {
+          address: {
+            city: query.city,
+          },
+        },
+      }),
+
+      ...(query.categoryId && {
+        business: {
+          categoryId: query.categoryId,
+        },
+      }),
+    };
+
+    // 2. cursor
+    let cursorCondition: Prisma.BusinessVerificationWhereInput = {};
+    if (query.cursor) {
+      const decoded = decodeAdminCursor(query.cursor);
+
+      cursorCondition = {
+        OR: [
+          { createdAt: { lt: new Date(decoded.createdAt) } },
+          {
+            createdAt: new Date(decoded.createdAt),
+            id: { lt: decoded.id },
+          },
+        ],
+      };
+    }
+
+    // 3. query
+    const verifications = await this.prisma.businessVerification.findMany({
+      where: {
+        AND: [where, cursorCondition],
+      },
+      take: limit + 1,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: {
+        verificationFile: {
+          select: {
+            id: true,
+            url: true,
+            mimeType: true,
+            originalName: true,
+          },
+        },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            logo: {
+              select: {
+                id: true,
+                url: true,
+                type: true,
+              },
+            },
+            owner: {
+              select: {
+                email: true,
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 4. pagination
+    const hasNextPage = verifications.length > limit;
+    const items = hasNextPage ? verifications.slice(0, limit) : verifications;
+
+    let nextCursor: string | null = null;
+    if (hasNextPage && items.length > 0) {
+      const last = items[items.length - 1];
+      nextCursor = encodeAdminCursor({
+        createdAt: last.createdAt.toISOString(),
+        id: last.id,
+      });
+    }
+
+    // 5. map to DTO
+    const mapped = items.map((v) => ({
+      id: v.id,
+      status: v.status,
+      submittedAt: v.submittedAt?.toISOString() ?? null,
+      reviewedAt: v.reviewedAt?.toISOString() ?? null,
+      rejectionReason: v.rejectionReason,
+      createdAt: v.createdAt.toISOString(),
+
+      verificationFile: v.verificationFile
+        ? {
+            id: v.verificationFile.id,
+            url: v.verificationFile.url,
+            mimeType: v.verificationFile.mimeType,
+            originalName: v.verificationFile.originalName,
+          }
+        : null,
+
+      business: {
+        id: v.business.id,
+        name: v.business.name,
+        logo: v.business.logo
+          ? {
+              id: v.business.logo.id,
+              url: v.business.logo.url,
+              type: v.business.logo.type,
+            }
+          : null,
+        owner: {
+          email: v.business.owner.email,
+          username: v.business.owner.username,
+        },
+      },
+    }));
+
+    return {
+      items: mapped,
+      meta: {
+        hasNextPage,
+        nextCursor,
+      },
+    };
+  }
+
   async deactivateBusiness(businessId: string): Promise<DeactivateBusinessResponseDto> {
     // Find business by id
     const business = await this.prisma.business.findUnique({
@@ -238,5 +384,140 @@ export class AdminService {
       businessId,
       status: newStatus,
     };
+  }
+
+  async approveVerification(verificationId: string, adminUserId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const verification = await tx.businessVerification.findUnique({
+        where: { id: verificationId },
+        include: {
+          business: true,
+        },
+      });
+
+      if (!verification) {
+        throw new NotFoundException('Verification not found');
+      }
+
+      if (verification.status !== BusinessVerificationStatus.PENDING) {
+        throw new BadRequestException('Only PENDING verification can be approved');
+      }
+
+      // 1. update verification
+      await tx.businessVerification.update({
+        where: { id: verificationId },
+        data: {
+          status: BusinessVerificationStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedByAdminId: adminUserId ?? null,
+          rejectionReason: null,
+        },
+      });
+
+      // 2. calculate business status
+      let finalBusinessStatus = verification.business.status;
+
+      if (
+        finalBusinessStatus === BusinessStatus.PENDING ||
+        finalBusinessStatus === BusinessStatus.REJECTED
+      ) {
+        finalBusinessStatus = BusinessStatus.ACTIVE;
+
+        await tx.business.update({
+          where: { id: verification.businessId },
+          data: { status: finalBusinessStatus },
+        });
+      }
+
+      // 3. response
+      return {
+        verificationId: verification.id,
+        verificationStatus: BusinessVerificationStatus.APPROVED,
+        businessId: verification.businessId,
+        businessStatus: finalBusinessStatus,
+      };
+    });
+  }
+
+  async rejectVerification(verificationId: string, rejectionReason: string, adminUserId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const verification = await tx.businessVerification.findUnique({
+        where: { id: verificationId },
+        include: {
+          business: {
+            include: {
+              category: true,
+            },
+          },
+        },
+      });
+
+      if (!verification) {
+        throw new NotFoundException('Verification not found');
+      }
+
+      if (verification.status !== BusinessVerificationStatus.PENDING) {
+        throw new BadRequestException('Only PENDING verification can be rejected');
+      }
+
+      // 1. update verification
+      await tx.businessVerification.update({
+        where: { id: verificationId },
+        data: {
+          status: BusinessVerificationStatus.REJECTED,
+          reviewedAt: new Date(),
+          reviewedByAdminId: adminUserId ?? null,
+          rejectionReason,
+        },
+      });
+
+      const business = verification.business;
+      const category = business.category;
+      const now = new Date();
+
+      let finalBusinessStatus = business.status;
+
+      // 2. business status logic
+      if (category.requiresVerification) {
+        const hasGracePeriod =
+          typeof category.gracePeriodHours === 'number' && category.gracePeriodHours > 0;
+
+        if (!hasGracePeriod) {
+          // mandatory verification without grace
+          if (business.status !== BusinessStatus.SUSPENDED) {
+            finalBusinessStatus = BusinessStatus.REJECTED;
+
+            await tx.business.update({
+              where: { id: business.id },
+              data: { status: finalBusinessStatus },
+            });
+          }
+        } else {
+          // mandatory verification with grace
+          const deadline = business.verificationGraceDeadlineAt;
+
+          if (deadline && deadline < now) {
+            if (business.status !== BusinessStatus.SUSPENDED) {
+              finalBusinessStatus = BusinessStatus.REJECTED;
+
+              await tx.business.update({
+                where: { id: business.id },
+                data: { status: finalBusinessStatus },
+              });
+            }
+          }
+          // grace active → do nothing
+        }
+      }
+      // category does not require verification → do nothing
+
+      // 3. response
+      return {
+        verificationId: verification.id,
+        verificationStatus: BusinessVerificationStatus.REJECTED,
+        businessId: business.id,
+        businessStatus: finalBusinessStatus,
+      };
+    });
   }
 }
