@@ -5,11 +5,16 @@ import { IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateBusinessHoursDto {
-  @ApiProperty({ example: 1, description: '0 = Monday, 6 = Sunday' })
+  @ApiProperty({
+    description: 'ISO weekday: 1=Monday ... 7=Sunday',
+    example: 1,
+    minimum: 1,
+    maximum: 7,
+  })
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  @Max(6)
+  @Min(1)
+  @Max(7)
   weekday!: number;
 
   @ApiPropertyOptional({ example: false })
