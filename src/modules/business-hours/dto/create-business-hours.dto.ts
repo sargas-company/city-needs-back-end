@@ -6,15 +6,15 @@ const TIME_24H_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateBusinessHoursDto {
   @ApiProperty({
-    description: 'ISO weekday: 1=Monday ... 7=Sunday',
-    example: 1,
-    minimum: 1,
-    maximum: 7,
+    description: '0 = Monday, 6 = Sunday',
+    example: 0,
+    minimum: 0,
+    maximum: 6,
   })
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(7)
+  @Min(0)
+  @Max(6)
   weekday!: number;
 
   @ApiPropertyOptional({ example: false })
