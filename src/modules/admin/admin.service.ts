@@ -7,6 +7,7 @@ import { encodeAdminCursor } from './cursor/encode-admin-cursor';
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
+import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
@@ -139,6 +140,61 @@ export class AdminService {
         hasNextPage,
       },
     };
+  }
+
+  async getStatisticsSummary(): Promise<AdminStatisticsSummaryDto> {
+    const result = await this.prisma.$queryRaw<Array<{ result: AdminStatisticsSummaryDto }>>`
+      WITH
+        businesses_by_category AS (
+          SELECT
+            c.id as "categoryId",
+            c.title,
+            COUNT(b.id) as count
+          FROM categories c
+          LEFT JOIN businesses b
+            ON b."categoryId" = c.id
+            AND b.status IN ('ACTIVE', 'PENDING')
+          GROUP BY c.id, c.title
+        ),
+
+        totals AS (
+          SELECT
+            (SELECT COUNT(*)
+             FROM users
+             WHERE status != 'DELETED') as users,
+
+            (SELECT COUNT(*)
+             FROM businesses
+             WHERE status IN ('ACTIVE', 'PENDING')) as businesses,
+
+            (SELECT COUNT(*)
+             FROM users
+             WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+             AND status != 'DELETED') as "newUsers",
+
+            (SELECT COUNT(*)
+             FROM reels) as reels
+        )
+
+      SELECT json_build_object(
+        'businessesByCategory', (
+          SELECT COALESCE(
+            json_agg(
+              row_to_json(businesses_by_category)
+              ORDER BY count DESC, title ASC
+            ),
+            '[]'::json
+          )
+          FROM businesses_by_category
+        ),
+        'totals', (
+          SELECT row_to_json(totals)
+          FROM totals
+        )
+      ) as result
+    `;
+
+    return result[0].result;
   }
 
   async getVerifications(

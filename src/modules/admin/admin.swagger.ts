@@ -3,10 +3,24 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
+import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
+
+export function SwaggerAdminGetStatisticsSummary() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Get platform statistics summary (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Platform statistics including businesses by category and totals',
+      type: AdminStatisticsSummaryDto,
+    }),
+  );
+}
 
 export function SwaggerAdminGetBusinesses() {
   return applyDecorators(

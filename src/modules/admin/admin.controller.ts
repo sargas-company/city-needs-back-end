@@ -13,6 +13,7 @@ import {
   SwaggerAdminApproveVerification,
   SwaggerAdminDeactivateBusiness,
   SwaggerAdminGetBusinesses,
+  SwaggerAdminGetStatisticsSummary,
   SwaggerAdminGetVerification,
   SwaggerAdminGetVerifications,
   SwaggerAdminRejectVerification,
@@ -83,5 +84,12 @@ export class AdminController {
       user.id,
     );
     return successResponse<AdminVerificationActionResponseDto>(result);
+  }
+
+  @Get('statistics/summary')
+  @SwaggerAdminGetStatisticsSummary()
+  async getStatisticsSummary() {
+    const result = await this.adminService.getStatisticsSummary();
+    return successResponse(result);
   }
 }
