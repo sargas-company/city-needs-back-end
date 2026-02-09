@@ -13,6 +13,7 @@ import {
   SwaggerAdminApproveVerification,
   SwaggerAdminDeactivateBusiness,
   SwaggerAdminGetBusinesses,
+  SwaggerAdminGetVerification,
   SwaggerAdminGetVerifications,
   SwaggerAdminRejectVerification,
 } from './admin.swagger';
@@ -38,6 +39,13 @@ export class AdminController {
   @SwaggerAdminGetVerifications()
   async getVerifications(@Query() query: GetAdminVerificationsQueryDto) {
     const result = await this.adminService.getVerifications(query);
+    return successResponse(result);
+  }
+
+  @Get('verifications/:id')
+  @SwaggerAdminGetVerification()
+  async getVerification(@Param('id') id: string) {
+    const result = await this.adminService.getVerification(id);
     return successResponse(result);
   }
 

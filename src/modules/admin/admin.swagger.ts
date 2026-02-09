@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
+import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
 
@@ -29,6 +30,23 @@ export function SwaggerAdminGetVerifications() {
       status: 200,
       description: 'List of business verifications',
       type: AdminVerificationsResponseDto,
+    }),
+  );
+}
+
+export function SwaggerAdminGetVerification() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Get business verification by ID (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Business verification details',
+      type: AdminVerificationDetailDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Verification not found',
     }),
   );
 }

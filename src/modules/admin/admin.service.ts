@@ -7,6 +7,7 @@ import { encodeAdminCursor } from './cursor/encode-admin-cursor';
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
+import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
@@ -241,14 +242,156 @@ export class AdminService {
     }
 
     // 5. map to DTO
-    const mapped = items.map((v) => ({
+    const mapped = items.map((v) => this.mapVerificationToDto(v));
+
+    return {
+      items: mapped,
+      meta: {
+        hasNextPage,
+        nextCursor,
+      },
+    };
+  }
+
+  async getVerification(id: string): Promise<AdminVerificationDetailDto> {
+    const verification = await this.prisma.businessVerification.findUnique({
+      where: { id },
+      include: {
+        verificationFile: {
+          select: {
+            id: true,
+            url: true,
+            mimeType: true,
+            originalName: true,
+          },
+        },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            logo: {
+              select: {
+                id: true,
+                url: true,
+                type: true,
+              },
+            },
+            owner: {
+              select: {
+                email: true,
+                username: true,
+              },
+            },
+            category: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                description: true,
+                requiresVerification: true,
+                gracePeriodHours: true,
+              },
+            },
+            address: {
+              select: {
+                id: true,
+                countryCode: true,
+                city: true,
+                state: true,
+                addressLine1: true,
+                addressLine2: true,
+                zip: true,
+              },
+            },
+            files: {
+              select: {
+                id: true,
+                url: true,
+                type: true,
+                mimeType: true,
+                sizeBytes: true,
+                originalName: true,
+                createdAt: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!verification) {
+      throw new NotFoundException('Verification not found');
+    }
+
+    return this.mapVerificationToDto(verification, true);
+  }
+
+  private mapVerificationToDto(
+    v: {
+      id: string;
+      status: BusinessVerificationStatus;
+      submittedAt: Date | null;
+      reviewedAt: Date | null;
+      rejectionReason: string | null;
+      createdAt: Date;
+      verificationFile: {
+        id: string;
+        url: string;
+        mimeType: string | null;
+        originalName: string | null;
+      } | null;
+      business: {
+        id: string;
+        name: string;
+        logo: {
+          id: string;
+          url: string;
+          type: any;
+        } | null;
+        owner: {
+          email: string | null;
+          username: string | null;
+        };
+        category?: {
+          id: string;
+          title: string;
+          slug: string;
+          description: string | null;
+          requiresVerification: boolean;
+          gracePeriodHours: number | null;
+        };
+        address?: {
+          id: string;
+          countryCode: string;
+          city: string;
+          state: string;
+          addressLine1: string;
+          addressLine2: string | null;
+          zip: string | null;
+        } | null;
+        files?: Array<{
+          id: string;
+          url: string;
+          type: any;
+          mimeType: string | null;
+          sizeBytes: number | null;
+          originalName: string | null;
+          createdAt: Date;
+        }>;
+      };
+    },
+    includeExtended = false,
+  ): any {
+    const baseData = {
       id: v.id,
       status: v.status,
       submittedAt: v.submittedAt?.toISOString() ?? null,
       reviewedAt: v.reviewedAt?.toISOString() ?? null,
       rejectionReason: v.rejectionReason,
       createdAt: v.createdAt.toISOString(),
-
       verificationFile: v.verificationFile
         ? {
             id: v.verificationFile.id,
@@ -257,7 +400,59 @@ export class AdminService {
             originalName: v.verificationFile.originalName,
           }
         : null,
+    };
 
+    if (includeExtended && v.business.category) {
+      return {
+        ...baseData,
+        business: {
+          id: v.business.id,
+          name: v.business.name,
+          logo: v.business.logo
+            ? {
+                id: v.business.logo.id,
+                url: v.business.logo.url,
+                type: v.business.logo.type,
+              }
+            : null,
+          owner: {
+            email: v.business.owner.email,
+            username: v.business.owner.username,
+          },
+          category: {
+            id: v.business.category.id,
+            title: v.business.category.title,
+            slug: v.business.category.slug,
+            description: v.business.category.description,
+            requiresVerification: v.business.category.requiresVerification,
+            gracePeriodHours: v.business.category.gracePeriodHours,
+          },
+          address: v.business.address
+            ? {
+                id: v.business.address.id,
+                countryCode: v.business.address.countryCode,
+                city: v.business.address.city,
+                state: v.business.address.state,
+                addressLine1: v.business.address.addressLine1,
+                addressLine2: v.business.address.addressLine2,
+                zip: v.business.address.zip,
+              }
+            : null,
+          files: (v.business.files || []).map((file) => ({
+            id: file.id,
+            url: file.url,
+            type: file.type,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            originalName: file.originalName,
+            createdAt: file.createdAt.toISOString(),
+          })),
+        },
+      };
+    }
+
+    return {
+      ...baseData,
       business: {
         id: v.business.id,
         name: v.business.name,
@@ -272,14 +467,6 @@ export class AdminService {
           email: v.business.owner.email,
           username: v.business.owner.username,
         },
-      },
-    }));
-
-    return {
-      items: mapped,
-      meta: {
-        hasNextPage,
-        nextCursor,
       },
     };
   }
