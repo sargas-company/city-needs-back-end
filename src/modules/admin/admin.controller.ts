@@ -17,11 +17,13 @@ import {
   SwaggerAdminGetVerification,
   SwaggerAdminGetVerifications,
   SwaggerAdminRejectVerification,
+  SwaggerAdminRequestResubmission,
 } from './admin.swagger';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
 import { GetAdminVerificationsQueryDto } from './dto/get-admin-verifications-query.dto';
 import { RejectVerificationDto } from './dto/reject-verification.dto';
+import { RequestResubmissionDto } from './dto/request-resubmission.dto';
 
 @UseGuards(DbUserAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
@@ -81,6 +83,21 @@ export class AdminController {
     const result = await this.adminService.rejectVerification(
       verificationId,
       dto.rejectionReason,
+      user.id,
+    );
+    return successResponse<AdminVerificationActionResponseDto>(result);
+  }
+
+  @Post('verifications/:id/resubmission')
+  @SwaggerAdminRequestResubmission()
+  async requestResubmission(
+    @Param('id') verificationId: string,
+    @Body() dto: RequestResubmissionDto,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.adminService.requestResubmission(
+      verificationId,
+      dto.resubmissionReason,
       user.id,
     );
     return successResponse<AdminVerificationActionResponseDto>(result);

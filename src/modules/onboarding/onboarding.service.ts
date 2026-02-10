@@ -580,7 +580,13 @@ export class OnboardingService {
     const locked = await tx.businessVerification.findFirst({
       where: {
         businessId: business.id,
-        status: { in: [BusinessVerificationStatus.PENDING, BusinessVerificationStatus.APPROVED] },
+        status: {
+          in: [
+            BusinessVerificationStatus.PENDING,
+            BusinessVerificationStatus.APPROVED,
+            BusinessVerificationStatus.RESUBMISSION,
+          ]
+        },
       },
       select: { id: true, status: true },
     });

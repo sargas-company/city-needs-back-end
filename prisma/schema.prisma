@@ -31,6 +31,7 @@ enum BusinessVerificationStatus {
   PENDING
   APPROVED
   REJECTED
+  RESUBMISSION
 }
 
 enum BookingStatus {
@@ -353,6 +354,7 @@ model BusinessVerification {
   reviewedAt         DateTime?
   reviewedByAdminId  String?
   rejectionReason    String?
+  resubmissionReason String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 

@@ -6,7 +6,9 @@ import { GetCurrentVerificationFileResponseDto } from './dto/get-current-verific
 export function SwaggerGetCurrentVerificationFile() {
   return applyDecorators(
     ApiOkResponse({
-      description: 'Returns current verification file (or null if not uploaded).',
+      description:
+        'Returns current draft verification file (not attached to any verification). ' +
+        'Returns null if no draft file exists.',
       type: GetCurrentVerificationFileResponseDto,
     }),
   );

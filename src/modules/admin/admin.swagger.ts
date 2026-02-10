@@ -144,3 +144,24 @@ export function SwaggerAdminRejectVerification() {
     }),
   );
 }
+
+export function SwaggerAdminRequestResubmission() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Request resubmission of business verification (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Business verification moved to RESUBMISSION status',
+      type: AdminVerificationActionResponseDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Verification not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Only PENDING verification can be moved to RESUBMISSION',
+    }),
+  );
+}

@@ -70,8 +70,13 @@ export class VerificationFilesService {
       }
     }
 
+    // Delete only draft files (not attached to any verification)
     const existingCurrent = await this.prisma.file.findFirst({
-      where: { businessId: business.id, type: FileType.BUSINESS_VERIFICATION_DOCUMENT },
+      where: {
+        businessId: business.id,
+        type: FileType.BUSINESS_VERIFICATION_DOCUMENT,
+        verification: null, // Only delete files not attached to verification
+      },
       orderBy: { createdAt: 'desc' },
       select: { id: true, storageKey: true },
     });
@@ -81,7 +86,7 @@ export class VerificationFilesService {
       if (existingCurrent.storageKey) {
         await this.storage.deleteObject(existingCurrent.storageKey).catch((e) => {
           this.logger.warn(
-            `Failed to delete old current verification file from S3: ${existingCurrent.storageKey} ${String(e)}`,
+            `Failed to delete old draft verification file from S3: ${existingCurrent.storageKey} ${String(e)}`,
           );
         });
       }
@@ -158,58 +163,12 @@ export class VerificationFilesService {
     });
     if (!business) throw new ForbiddenException('Business is required for this action');
 
-    const locked = await this.prisma.businessVerification.findFirst({
-      where: {
-        businessId: business.id,
-        status: {
-          in: [
-            BusinessVerificationStatus.PENDING,
-            BusinessVerificationStatus.APPROVED,
-            BusinessVerificationStatus.REJECTED,
-          ],
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        verificationFile: {
-          select: {
-            id: true,
-            url: true,
-            type: true,
-            originalName: true,
-            mimeType: true,
-            sizeBytes: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-
-    if (locked?.verificationFile) {
-      const f = locked.verificationFile;
-      return {
-        id: f.id,
-        url: f.url,
-        type: f.type,
-        originalName: f.originalName ?? null,
-        mimeType: f.mimeType ?? null,
-        sizeBytes: f.sizeBytes ?? null,
-        createdAt: f.createdAt,
-        lock: {
-          verificationId: locked.id,
-          status: locked.status,
-          createdAt: locked.createdAt,
-        },
-      };
-    }
-
+    // Return only draft files (not attached to any verification)
     const file = await this.prisma.file.findFirst({
       where: {
         businessId: business.id,
         type: FileType.BUSINESS_VERIFICATION_DOCUMENT,
+        verification: null, // Only draft files
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -233,7 +192,6 @@ export class VerificationFilesService {
       mimeType: file.mimeType ?? null,
       sizeBytes: file.sizeBytes ?? null,
       createdAt: file.createdAt,
-      lock: null,
     };
   }
 
@@ -273,30 +231,21 @@ export class VerificationFilesService {
 
     await this.assertOwnerOrAdmin(user, file.businessId);
 
-    const blocking = await this.prisma.businessVerification.findFirst({
-      where: {
-        verificationFileId: file.id,
-        status: { in: ['PENDING', 'APPROVED'] as any },
-      },
+    // Block deletion of files attached to ANY verification (preserve history)
+    const attached = await this.prisma.businessVerification.findFirst({
+      where: { verificationFileId: file.id },
       select: { id: true, status: true },
     });
 
-    if (blocking) {
-      throw new ConflictException('Verification file is in use and cannot be deleted');
+    if (attached) {
+      throw new ConflictException(
+        `Cannot delete file attached to verification (status: ${attached.status}). Only draft files can be deleted.`,
+      );
     }
 
     const storageKey = file.storageKey;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.businessVerification.deleteMany({
-        where: {
-          verificationFileId: file.id,
-          status: 'REJECTED' as any,
-        },
-      });
-
-      await tx.file.delete({ where: { id: file.id } });
-    });
+    await this.prisma.file.delete({ where: { id: file.id } });
 
     if (storageKey) {
       await this.storage.deleteObject(storageKey).catch((e) => {

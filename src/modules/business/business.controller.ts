@@ -2,9 +2,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
+  Post,
   Put,
   Query,
   UploadedFile,
@@ -22,14 +24,23 @@ import { successResponse } from 'src/common/utils/response.util';
 import { SwaggerUpdateMyBusinessProfile } from './business-profile.swagger';
 import { BusinessService } from './business.service';
 import {
+  SwaggerDeleteVerificationFile,
   SwaggerGetBusinessById,
   SwaggerGetBusinessBookings,
+  SwaggerGetCurrentVerificationFile,
+  SwaggerSubmitVerification,
   SwaggerUpdateMyBusinessLogo,
+  SwaggerUploadVerificationFile,
 } from './business.swagger';
 import { BookingService } from '../booking/booking.service';
+import {
+  SubmitVerificationDto,
+  SubmitVerificationResponseDto,
+} from './dto/submit-verification.dto';
 import { UpdateBusinessLogoDto } from './dto/update-business-logo.dto';
 import { UpdateBusinessProfileDto } from './dto/update-business-profile.dto';
 import { GetBusinessBookingsQueryDto } from '../booking/dto/get-business-bookings-query.dto';
+import { VerificationFilesService } from '../verification-files/verification-files.service';
 
 @ApiTags('Business')
 @ApiBearerAuth()
@@ -39,6 +50,7 @@ export class BusinessController {
   constructor(
     private readonly businessService: BusinessService,
     private readonly bookingService: BookingService,
+    private readonly verificationFilesService: VerificationFilesService,
   ) {}
 
   @Put('me/logo')
@@ -64,6 +76,54 @@ export class BusinessController {
   async updateMyProfile(@CurrentUser() user: User, @Body() dto: UpdateBusinessProfileDto) {
     const result = await this.businessService.updateProfile(user, dto);
     return successResponse(result);
+  }
+
+  @Post('verification-file')
+  @SwaggerUploadVerificationFile()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    required: true,
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+    }),
+  )
+  async uploadVerificationFile(
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const saved = await this.verificationFilesService.uploadVerificationFile(user, file);
+    return successResponse({ file: saved }, 201);
+  }
+
+  @Get('verification-file/current')
+  @SwaggerGetCurrentVerificationFile()
+  async getCurrentVerificationFile(@CurrentUser() user: User) {
+    const file = await this.verificationFilesService.getCurrentVerificationFile(user);
+    return successResponse({ file });
+  }
+
+  @Delete('verification-file/:id')
+  @SwaggerDeleteVerificationFile()
+  async deleteVerificationFile(@CurrentUser() user: User, @Param('id') fileId: string) {
+    await this.verificationFilesService.deleteVerificationFile(user, fileId);
+    return successResponse({ deleted: true });
+  }
+
+  @Post('verification/submit')
+  @SwaggerSubmitVerification()
+  async submitVerification(@CurrentUser() user: User, @Body() dto: SubmitVerificationDto) {
+    const result = await this.businessService.submitVerification(user, dto.verificationFileId);
+    return successResponse<SubmitVerificationResponseDto>(result);
   }
 
   @Get('bookings')

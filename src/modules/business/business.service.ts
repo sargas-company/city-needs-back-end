@@ -3,11 +3,19 @@ import { randomUUID } from 'crypto';
 
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Business, BusinessStatus, FileType, Prisma, User } from '@prisma/client';
+import {
+  Business,
+  BusinessStatus,
+  BusinessVerificationStatus,
+  FileType,
+  Prisma,
+  User,
+} from '@prisma/client';
 import { BusinessHoursService } from 'src/modules/business-hours/business-hours.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
@@ -294,5 +302,91 @@ export class BusinessService {
         type: file.type,
       })),
     };
+  }
+
+  async submitVerification(user: User, verificationFileId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Get business for current user
+      const business = await tx.business.findUnique({
+        where: { ownerUserId: user.id },
+        select: { id: true },
+      });
+
+      if (!business) {
+        throw new ForbiddenException('Business not found for current user');
+      }
+
+      // 2. Check that there's no active verification (PENDING, APPROVED)
+      const locked = await tx.businessVerification.findFirst({
+        where: {
+          businessId: business.id,
+          status: {
+            in: [BusinessVerificationStatus.PENDING, BusinessVerificationStatus.APPROVED],
+          },
+        },
+        select: { id: true, status: true },
+      });
+
+      if (locked) {
+        throw new ConflictException(
+          `Verification is locked (${locked.status}). Cannot submit a new verification.`,
+        );
+      }
+
+      // 3. Check if any verification exists
+      const anyVerification = await tx.businessVerification.findFirst({
+        where: { businessId: business.id },
+        select: { id: true, status: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Allow submission if:
+      // - No verifications exist (first-time verification for optional categories or grace period)
+      // - Previous verification is RESUBMISSION or REJECTED
+      const canSubmit =
+        !anyVerification ||
+        anyVerification.status === BusinessVerificationStatus.RESUBMISSION ||
+        anyVerification.status === BusinessVerificationStatus.REJECTED;
+
+      if (!canSubmit) {
+        throw new ConflictException(
+          `Cannot submit verification. Previous verification status: ${anyVerification?.status}. Only RESUBMISSION or REJECTED statuses allow new submissions.`,
+        );
+      }
+
+      // 4. Validate the new verification file
+      const file = await tx.file.findUnique({
+        where: { id: verificationFileId },
+        select: { id: true, businessId: true, type: true },
+      });
+
+      if (!file) {
+        throw new BadRequestException('Verification file not found');
+      }
+
+      if (file.businessId !== business.id) {
+        throw new ForbiddenException('Verification file does not belong to your business');
+      }
+
+      if (file.type !== FileType.BUSINESS_VERIFICATION_DOCUMENT) {
+        throw new BadRequestException('File is not a BUSINESS_VERIFICATION_DOCUMENT');
+      }
+
+      // 5. Create NEW verification record with PENDING status
+      const newVerification = await tx.businessVerification.create({
+        data: {
+          businessId: business.id,
+          status: BusinessVerificationStatus.PENDING,
+          verificationFileId: file.id,
+          submittedAt: new Date(),
+        },
+      });
+
+      return {
+        verificationId: newVerification.id,
+        status: BusinessVerificationStatus.PENDING,
+        message: 'Verification has been submitted successfully',
+      };
+    });
   }
 }

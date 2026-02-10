@@ -14,5 +14,6 @@ import { VerificationFilesService } from './verification-files.service';
   imports: [PrismaModule, StorageModule, FirebaseModule, AuthModule],
   controllers: [VerificationFilesController, FilesController],
   providers: [VerificationFilesService, DbUserAuthGuard],
+  exports: [VerificationFilesService],
 })
 export class VerificationFilesModule {}

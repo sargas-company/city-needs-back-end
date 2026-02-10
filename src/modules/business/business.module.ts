@@ -14,9 +14,16 @@ import { BusinessServicesController } from './services/business-services.control
 import { BusinessServicesService } from './services/business-services.service';
 import { AvailabilityModule } from '../availability/availability.module';
 import { BookingModule } from '../booking/booking.module';
+import { VerificationFilesModule } from '../verification-files/verification-files.module';
 
 @Module({
-  imports: [FirebaseModule, StorageModule, AvailabilityModule, BookingModule],
+  imports: [
+    FirebaseModule,
+    StorageModule,
+    AvailabilityModule,
+    BookingModule,
+    VerificationFilesModule,
+  ],
   controllers: [
     BusinessController,
     BusinessServicesController,

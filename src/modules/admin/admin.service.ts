@@ -592,6 +592,9 @@ export class AdminService {
       const hasPending = business.verifications.some(
         (v) => v.status === BusinessVerificationStatus.PENDING,
       );
+      const hasResubmission = business.verifications.some(
+        (v) => v.status === BusinessVerificationStatus.RESUBMISSION,
+      );
       const hasRejected = business.verifications.some(
         (v) => v.status === BusinessVerificationStatus.REJECTED,
       );
@@ -599,6 +602,8 @@ export class AdminService {
       if (hasApproved) {
         newStatus = BusinessStatus.ACTIVE;
       } else if (hasPending) {
+        newStatus = BusinessStatus.PENDING;
+      } else if (hasResubmission) {
         newStatus = BusinessStatus.PENDING;
       } else if (hasRejected) {
         newStatus = BusinessStatus.REJECTED;
@@ -760,6 +765,55 @@ export class AdminService {
         verificationStatus: BusinessVerificationStatus.REJECTED,
         businessId: business.id,
         businessStatus: finalBusinessStatus,
+      };
+    });
+  }
+
+  async requestResubmission(
+    verificationId: string,
+    resubmissionReason: string,
+    adminUserId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const verification = await tx.businessVerification.findUnique({
+        where: { id: verificationId },
+        include: {
+          business: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (!verification) {
+        throw new NotFoundException('Verification not found');
+      }
+
+      if (verification.status !== BusinessVerificationStatus.PENDING) {
+        throw new BadRequestException('Only PENDING verification can be moved to RESUBMISSION');
+      }
+
+      // 1. update verification
+      await tx.businessVerification.update({
+        where: { id: verificationId },
+        data: {
+          status: BusinessVerificationStatus.RESUBMISSION,
+          reviewedAt: new Date(),
+          reviewedByAdminId: adminUserId ?? null,
+          resubmissionReason,
+        },
+      });
+
+      // 2. business status remains unchanged (waiting for resubmission)
+
+      // 3. response
+      return {
+        verificationId: verification.id,
+        verificationStatus: BusinessVerificationStatus.RESUBMISSION,
+        businessId: verification.business.id,
+        businessStatus: verification.business.status,
       };
     });
   }
