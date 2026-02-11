@@ -2,6 +2,7 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
+import { AdminBusinessDetailDto } from './dto/admin-business-detail.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
@@ -31,6 +32,25 @@ export function SwaggerAdminGetBusinesses() {
       status: 200,
       description: 'List of all businesses',
       type: AdminBusinessesResponseDto,
+    }),
+  );
+}
+
+export function SwaggerAdminGetBusiness() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Get full business details including all verifications (admin only)',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Business details with all verifications',
+      type: AdminBusinessDetailDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Business not found',
     }),
   );
 }

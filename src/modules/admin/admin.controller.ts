@@ -12,9 +12,9 @@ import {
   SwaggerAdminActivateBusiness,
   SwaggerAdminApproveVerification,
   SwaggerAdminDeactivateBusiness,
+  SwaggerAdminGetBusiness,
   SwaggerAdminGetBusinesses,
   SwaggerAdminGetStatisticsSummary,
-  SwaggerAdminGetVerification,
   SwaggerAdminGetVerifications,
   SwaggerAdminRejectVerification,
   SwaggerAdminRequestResubmission,
@@ -45,10 +45,10 @@ export class AdminController {
     return successResponse(result);
   }
 
-  @Get('verifications/:id')
-  @SwaggerAdminGetVerification()
-  async getVerification(@Param('id') id: string) {
-    const result = await this.adminService.getVerification(id);
+  @Get('businesses/:id')
+  @SwaggerAdminGetBusiness()
+  async getBusiness(@Param('id') id: string) {
+    const result = await this.adminService.getBusiness(id);
     return successResponse(result);
   }
 

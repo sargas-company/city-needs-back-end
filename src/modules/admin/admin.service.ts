@@ -5,6 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { decodeAdminCursor } from './cursor/decode-admin-cursor';
 import { encodeAdminCursor } from './cursor/encode-admin-cursor';
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
+import { AdminBusinessDetailDto } from './dto/admin-business-detail.dto';
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
@@ -139,6 +140,148 @@ export class AdminService {
         nextCursor,
         hasNextPage,
       },
+    };
+  }
+
+  async getBusiness(businessId: string): Promise<AdminBusinessDetailDto> {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      include: {
+        logo: {
+          select: {
+            id: true,
+            url: true,
+            type: true,
+          },
+        },
+        owner: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            description: true,
+            requiresVerification: true,
+            gracePeriodHours: true,
+          },
+        },
+        address: {
+          select: {
+            id: true,
+            countryCode: true,
+            city: true,
+            state: true,
+            addressLine1: true,
+            addressLine2: true,
+            zip: true,
+          },
+        },
+        files: {
+          select: {
+            id: true,
+            url: true,
+            type: true,
+            mimeType: true,
+            sizeBytes: true,
+            originalName: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+        verifications: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          include: {
+            verificationFile: {
+              select: {
+                id: true,
+                url: true,
+                mimeType: true,
+                originalName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Business not found');
+    }
+
+    return {
+      id: business.id,
+      name: business.name,
+      status: business.status,
+      createdAt: business.createdAt.toISOString(),
+      updatedAt: business.updatedAt.toISOString(),
+      logo: business.logo
+        ? {
+            id: business.logo.id,
+            url: business.logo.url,
+            type: business.logo.type,
+          }
+        : null,
+      owner: {
+        id: business.owner.id,
+        email: business.owner.email,
+        username: business.owner.username,
+      },
+      category: {
+        id: business.category.id,
+        title: business.category.title,
+        slug: business.category.slug,
+        description: business.category.description,
+        requiresVerification: business.category.requiresVerification,
+        gracePeriodHours: business.category.gracePeriodHours,
+      },
+      address: business.address
+        ? {
+            id: business.address.id,
+            countryCode: business.address.countryCode,
+            city: business.address.city,
+            state: business.address.state,
+            addressLine1: business.address.addressLine1,
+            addressLine2: business.address.addressLine2,
+            zip: business.address.zip,
+          }
+        : null,
+      files: business.files.map((file) => ({
+        id: file.id,
+        url: file.url,
+        type: file.type,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        originalName: file.originalName,
+        createdAt: file.createdAt.toISOString(),
+      })),
+      verifications: business.verifications.map((v) => ({
+        id: v.id,
+        status: v.status,
+        submittedAt: v.submittedAt?.toISOString() ?? null,
+        reviewedAt: v.reviewedAt?.toISOString() ?? null,
+        rejectionReason: v.rejectionReason,
+        resubmissionReason: v.resubmissionReason,
+        createdAt: v.createdAt.toISOString(),
+        reviewedByAdminId: v.reviewedByAdminId,
+        verificationFile: v.verificationFile
+          ? {
+              id: v.verificationFile.id,
+              url: v.verificationFile.url,
+              mimeType: v.verificationFile.mimeType,
+              originalName: v.verificationFile.originalName,
+            }
+          : null,
+      })),
     };
   }
 
