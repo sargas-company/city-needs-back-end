@@ -9,6 +9,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -18,30 +19,49 @@ export function SwaggerReelsTag() {
 }
 
 // ============================================================
-// GET /business/me/reel
+// GET /business/me/reels
 // ============================================================
 
-export function SwaggerGetMyReel() {
+export function SwaggerGetMyReels() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Get current business Reel',
-      description:
-        'Returns the current Reel for the authenticated business owner. Returns null if no Reel exists.',
+      summary: 'Get all business Reels',
+      description: 'Returns all Reels for the authenticated business owner (max 5).',
     }),
     ApiOkResponse({
-      description: 'Reel found or null if not exists',
+      description: 'List of reels (may be empty)',
       schema: {
         example: {
           success: true,
           data: {
-            reel: {
-              id: 'uuid',
-              businessId: 'uuid',
-              video: {
-                url: 'https://cdn.example.com/public/business/{id}/reels/video.mp4',
+            reels: [
+              {
+                id: 'uuid-1',
+                businessId: 'uuid',
+                status: 'PENDING',
+                submittedAt: '2026-01-01T12:00:00.000Z',
+                reviewedAt: null,
+                rejectionReason: null,
+                video: {
+                  url: 'https://cdn.example.com/public/business/{id}/reels/video1.mp4',
+                },
+                createdAt: '2026-01-01T12:00:00.000Z',
+                updatedAt: '2026-01-01T12:00:00.000Z',
               },
-              createdAt: '2026-01-01T12:00:00.000Z',
-            },
+              {
+                id: 'uuid-2',
+                businessId: 'uuid',
+                status: 'APPROVED',
+                submittedAt: '2025-12-25T10:00:00.000Z',
+                reviewedAt: '2025-12-26T10:00:00.000Z',
+                rejectionReason: null,
+                video: {
+                  url: 'https://cdn.example.com/public/business/{id}/reels/video2.mp4',
+                },
+                createdAt: '2025-12-25T10:00:00.000Z',
+                updatedAt: '2025-12-26T10:00:00.000Z',
+              },
+            ],
           },
         },
       },
@@ -54,15 +74,15 @@ export function SwaggerGetMyReel() {
 }
 
 // ============================================================
-// POST /business/me/reel
+// POST /business/me/reels
 // ============================================================
 
-export function SwaggerUpsertReel() {
+export function SwaggerUploadReel() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Upload or replace business Reel',
+      summary: 'Upload new Reel',
       description:
-        'Uploads a new Reel video. If a Reel already exists, it will be safely replaced.',
+        'Uploads a new Reel video. Maximum 5 reels allowed per business (PENDING + APPROVED). REJECTED reels do not count towards limit.',
     }),
     ApiBearerAuth(),
     ApiConsumes('multipart/form-data'),
@@ -81,7 +101,7 @@ export function SwaggerUpsertReel() {
       },
     }),
     ApiOkResponse({
-      description: 'Reel uploaded or replaced successfully',
+      description: 'Reel uploaded successfully',
       schema: {
         example: {
           success: true,
@@ -89,10 +109,15 @@ export function SwaggerUpsertReel() {
             reel: {
               id: 'uuid',
               businessId: 'uuid',
+              status: 'PENDING',
+              submittedAt: '2026-01-01T12:00:00.000Z',
+              reviewedAt: null,
+              rejectionReason: null,
               video: {
                 url: 'https://cdn.example.com/public/business/{id}/reels/video.mp4',
               },
               createdAt: '2026-01-01T12:00:00.000Z',
+              updatedAt: '2026-01-01T12:00:00.000Z',
             },
           },
         },
@@ -100,24 +125,28 @@ export function SwaggerUpsertReel() {
     }),
     ApiUnauthorizedResponse({ description: 'Unauthorized' }),
     ApiForbiddenResponse({
-      description: 'Active business is required',
+      description: 'Active business is required or maximum 5 reels reached',
     }),
   );
 }
 
 // ============================================================
-// DELETE /business/me/reel
+// DELETE /business/me/reels/:id
 // ============================================================
 
-export function SwaggerDeleteMyReel() {
+export function SwaggerDeleteReel() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Delete current business Reel',
-      description:
-        'Deletes the current Reel. If no Reel exists, the operation succeeds with no effect.',
+      summary: 'Delete a Reel',
+      description: 'Deletes the specified Reel by ID.',
+    }),
+    ApiParam({
+      name: 'id',
+      description: 'Reel ID',
+      type: 'string',
     }),
     ApiOkResponse({
-      description: 'Reel deleted (or did not exist)',
+      description: 'Reel deleted successfully',
       schema: {
         example: {
           success: true,
@@ -132,7 +161,7 @@ export function SwaggerDeleteMyReel() {
       description: 'Active business is required',
     }),
     ApiNotFoundResponse({
-      description: 'Business not found',
+      description: 'Reel not found',
     }),
   );
 }

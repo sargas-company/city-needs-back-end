@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
 
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
-import { BusinessStatus, FileType, User } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { BusinessStatus, FileType, User, ReelStatus } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
@@ -12,6 +18,7 @@ export class ReelsService {
 
   private readonly MAX_SIZE_MB = 30;
   private readonly ALLOWED_MIME = new Set(['video/mp4', 'video/quicktime']);
+  private readonly MAX_REELS_PER_BUSINESS = 5;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,23 +26,24 @@ export class ReelsService {
   ) {}
 
   // ============================================================
-  // GET
+  // GET MY REELS
   // ============================================================
 
-  async getMyReel(user: User) {
+  async getMyReels(user: User) {
     const business = await this.getActiveBusinessOrThrow(user);
 
-    return this.prisma.reel.findFirst({
+    return this.prisma.reel.findMany({
       where: { businessId: business.id },
       include: { video: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   // ============================================================
-  // UPSERT
+  // CREATE REEL
   // ============================================================
 
-  async upsertReel(user: User, file: Express.Multer.File) {
+  async createReel(user: User, file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Video file is required');
     }
@@ -43,11 +51,6 @@ export class ReelsService {
     this.validateFile(file);
 
     const business = await this.getActiveBusinessOrThrow(user);
-
-    const existing = await this.prisma.reel.findFirst({
-      where: { businessId: business.id },
-      include: { video: true },
-    });
 
     const ext = this.guessExt(file.mimetype);
     const storageKey = `public/business/${business.id}/reels/${randomUUID()}.${ext}`;
@@ -60,9 +63,15 @@ export class ReelsService {
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
-        if (existing) {
-          await tx.reel.delete({ where: { id: existing.id } });
-          await tx.file.delete({ where: { id: existing.videoFileId } });
+        const activeReelsCount = await tx.reel.count({
+          where: {
+            businessId: business.id,
+            status: { in: [ReelStatus.PENDING, ReelStatus.APPROVED] },
+          },
+        });
+
+        if (activeReelsCount >= this.MAX_REELS_PER_BUSINESS) {
+          throw new BadRequestException('Maximum 5 reels allowed');
         }
 
         const videoFile = await tx.file.create({
@@ -81,46 +90,45 @@ export class ReelsService {
           data: {
             businessId: business.id,
             videoFileId: videoFile.id,
+            submittedAt: new Date(),
           },
           include: { video: true },
         });
       });
 
-      if (existing?.video.storageKey) {
-        this.storage
-          .deleteObject(existing.video.storageKey)
-          .catch((e) => this.logger.warn(`Failed to delete old reel video: ${String(e)}`));
-      }
-
       return created;
     } catch (err) {
-      // rollback uploaded file
       await this.storage.deleteObject(uploaded.storageKey).catch(() => undefined);
       throw err;
     }
   }
 
   // ============================================================
-  // DELETE
+  // DELETE REEL
   // ============================================================
 
-  async deleteMyReel(user: User): Promise<void> {
+  async deleteReel(user: User, reelId: string): Promise<void> {
     const business = await this.getActiveBusinessOrThrow(user);
 
-    const existing = await this.prisma.reel.findFirst({
-      where: { businessId: business.id },
+    const reel = await this.prisma.reel.findFirst({
+      where: {
+        id: reelId,
+        businessId: business.id,
+      },
       include: { video: true },
     });
 
-    if (!existing) return;
+    if (!reel) {
+      throw new NotFoundException('Reel not found');
+    }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.reel.delete({ where: { id: existing.id } });
-      await tx.file.delete({ where: { id: existing.videoFileId } });
+      await tx.reel.delete({ where: { id: reel.id } });
+      await tx.file.delete({ where: { id: reel.videoFileId } });
     });
 
-    if (existing.video.storageKey) {
-      await this.storage.deleteObject(existing.video.storageKey).catch((e) => {
+    if (reel.video.storageKey) {
+      await this.storage.deleteObject(reel.video.storageKey).catch((e) => {
         this.logger.warn(`Failed to delete reel video: ${String(e)}`);
       });
     }

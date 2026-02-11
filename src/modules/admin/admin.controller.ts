@@ -10,18 +10,21 @@ import { successResponse } from 'src/common/utils/response.util';
 import { AdminService } from './admin.service';
 import {
   SwaggerAdminActivateBusiness,
+  SwaggerAdminApproveReel,
   SwaggerAdminApproveVerification,
   SwaggerAdminDeactivateBusiness,
+  SwaggerAdminGetBusiness,
   SwaggerAdminGetBusinesses,
   SwaggerAdminGetStatisticsSummary,
-  SwaggerAdminGetVerification,
   SwaggerAdminGetVerifications,
+  SwaggerAdminRejectReel,
   SwaggerAdminRejectVerification,
   SwaggerAdminRequestResubmission,
 } from './admin.swagger';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
 import { GetAdminVerificationsQueryDto } from './dto/get-admin-verifications-query.dto';
+import { RejectReelDto } from './dto/reject-reel.dto';
 import { RejectVerificationDto } from './dto/reject-verification.dto';
 import { RequestResubmissionDto } from './dto/request-resubmission.dto';
 
@@ -38,17 +41,17 @@ export class AdminController {
     return successResponse(result);
   }
 
+  @Get('businesses/:id')
+  @SwaggerAdminGetBusiness()
+  async getBusiness(@Param('id') id: string) {
+    const result = await this.adminService.getBusiness(id);
+    return successResponse(result);
+  }
+
   @Get('verifications')
   @SwaggerAdminGetVerifications()
   async getVerifications(@Query() query: GetAdminVerificationsQueryDto) {
     const result = await this.adminService.getVerifications(query);
-    return successResponse(result);
-  }
-
-  @Get('verifications/:id')
-  @SwaggerAdminGetVerification()
-  async getVerification(@Param('id') id: string) {
-    const result = await this.adminService.getVerification(id);
     return successResponse(result);
   }
 
@@ -107,6 +110,24 @@ export class AdminController {
   @SwaggerAdminGetStatisticsSummary()
   async getStatisticsSummary() {
     const result = await this.adminService.getStatisticsSummary();
+    return successResponse(result);
+  }
+
+  @Post('reels/:id/approve')
+  @SwaggerAdminApproveReel()
+  async approveReel(@Param('id') reelId: string, @CurrentUser() user: User) {
+    const result = await this.adminService.approveReel(reelId, user.id);
+    return successResponse(result);
+  }
+
+  @Post('reels/:id/reject')
+  @SwaggerAdminRejectReel()
+  async rejectReel(
+    @Param('id') reelId: string,
+    @Body() dto: RejectReelDto,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.adminService.rejectReel(reelId, dto.rejectionReason, user.id);
     return successResponse(result);
   }
 }

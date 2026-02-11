@@ -113,6 +113,12 @@ enum AnalyticsSource {
   REELS
 }
 
+enum ReelStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // MODELS
 
 model User {
@@ -592,10 +598,23 @@ model Reel {
   videoFileId String   @unique
   video       File     @relation("ReelVideo", fields: [videoFileId], references: [id], onDelete: Restrict)
 
+  status      ReelStatus @default(PENDING)
+
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedByAdminId String?
+
+  rejectionReason String?
+
+  cleanupAt   DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([businessId])
+  @@index([status])
+  @@index([cleanupAt])
+  @@index([status, cleanupAt])
   @@index([createdAt, id])
   @@map("reels")
 }

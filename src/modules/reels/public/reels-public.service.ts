@@ -20,6 +20,7 @@ export class ReelsPublicService {
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : null;
 
     const where: Prisma.ReelWhereInput = {
+      status: 'APPROVED',
       business: {
         status: 'ACTIVE',
         ...(query.categoryId && { categoryId: query.categoryId }),

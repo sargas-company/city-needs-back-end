@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BusinessStatus, BusinessVerificationStatus, Prisma } from '@prisma/client';
+import { BusinessStatus, BusinessVerificationStatus, Prisma, ReelStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { decodeAdminCursor } from './cursor/decode-admin-cursor';
@@ -8,7 +8,6 @@ import { ActivateBusinessResponseDto } from './dto/activate-business-response.dt
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
-import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
@@ -139,6 +138,161 @@ export class AdminService {
         nextCursor,
         hasNextPage,
       },
+    };
+  }
+
+  async getBusiness(businessId: string) {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      include: {
+        logo: {
+          select: {
+            id: true,
+            url: true,
+            type: true,
+          },
+        },
+        owner: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            description: true,
+            requiresVerification: true,
+            gracePeriodHours: true,
+          },
+        },
+        address: {
+          select: {
+            id: true,
+            countryCode: true,
+            city: true,
+            state: true,
+            addressLine1: true,
+            addressLine2: true,
+            zip: true,
+          },
+        },
+        files: {
+          include: {
+            reel: {
+              select: {
+                id: true,
+                status: true,
+                submittedAt: true,
+                reviewedAt: true,
+                rejectionReason: true,
+                createdAt: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+        verifications: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          include: {
+            verificationFile: {
+              select: {
+                id: true,
+                url: true,
+                mimeType: true,
+                originalName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Business not found');
+    }
+
+    return {
+      id: business.id,
+      name: business.name,
+      status: business.status,
+      createdAt: business.createdAt.toISOString(),
+      updatedAt: business.updatedAt.toISOString(),
+      logo: business.logo
+        ? {
+            id: business.logo.id,
+            url: business.logo.url,
+            type: business.logo.type,
+          }
+        : null,
+      owner: {
+        id: business.owner.id,
+        email: business.owner.email,
+        username: business.owner.username,
+      },
+      category: {
+        id: business.category.id,
+        title: business.category.title,
+        slug: business.category.slug,
+        description: business.category.description,
+        requiresVerification: business.category.requiresVerification,
+        gracePeriodHours: business.category.gracePeriodHours,
+      },
+      address: business.address
+        ? {
+            id: business.address.id,
+            countryCode: business.address.countryCode,
+            city: business.address.city,
+            state: business.address.state,
+            addressLine1: business.address.addressLine1,
+            addressLine2: business.address.addressLine2,
+            zip: business.address.zip,
+          }
+        : null,
+      files: business.files.map((file) => ({
+        id: file.id,
+        url: file.url,
+        type: file.type,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        originalName: file.originalName,
+        createdAt: file.createdAt.toISOString(),
+        reel: file.reel
+          ? {
+              id: file.reel.id,
+              status: file.reel.status,
+              submittedAt: file.reel.submittedAt?.toISOString() ?? null,
+              reviewedAt: file.reel.reviewedAt?.toISOString() ?? null,
+              rejectionReason: file.reel.rejectionReason,
+              createdAt: file.reel.createdAt.toISOString(),
+            }
+          : null,
+      })),
+      verifications: business.verifications.map((v) => ({
+        id: v.id,
+        status: v.status,
+        submittedAt: v.submittedAt?.toISOString() ?? null,
+        reviewedAt: v.reviewedAt?.toISOString() ?? null,
+        rejectionReason: v.rejectionReason,
+        resubmissionReason: v.resubmissionReason,
+        createdAt: v.createdAt.toISOString(),
+        reviewedByAdminId: v.reviewedByAdminId,
+        verificationFile: v.verificationFile
+          ? {
+              id: v.verificationFile.id,
+              url: v.verificationFile.url,
+              mimeType: v.verificationFile.mimeType,
+              originalName: v.verificationFile.originalName,
+            }
+          : null,
+      })),
     };
   }
 
@@ -307,82 +461,6 @@ export class AdminService {
         nextCursor,
       },
     };
-  }
-
-  async getVerification(id: string): Promise<AdminVerificationDetailDto> {
-    const verification = await this.prisma.businessVerification.findUnique({
-      where: { id },
-      include: {
-        verificationFile: {
-          select: {
-            id: true,
-            url: true,
-            mimeType: true,
-            originalName: true,
-          },
-        },
-        business: {
-          select: {
-            id: true,
-            name: true,
-            logo: {
-              select: {
-                id: true,
-                url: true,
-                type: true,
-              },
-            },
-            owner: {
-              select: {
-                email: true,
-                username: true,
-              },
-            },
-            category: {
-              select: {
-                id: true,
-                title: true,
-                slug: true,
-                description: true,
-                requiresVerification: true,
-                gracePeriodHours: true,
-              },
-            },
-            address: {
-              select: {
-                id: true,
-                countryCode: true,
-                city: true,
-                state: true,
-                addressLine1: true,
-                addressLine2: true,
-                zip: true,
-              },
-            },
-            files: {
-              select: {
-                id: true,
-                url: true,
-                type: true,
-                mimeType: true,
-                sizeBytes: true,
-                originalName: true,
-                createdAt: true,
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!verification) {
-      throw new NotFoundException('Verification not found');
-    }
-
-    return this.mapVerificationToDto(verification, true);
   }
 
   private mapVerificationToDto(
@@ -816,5 +894,112 @@ export class AdminService {
         businessStatus: verification.business.status,
       };
     });
+  }
+
+  // ============================================================
+  // REELS MODERATION
+  // ============================================================
+
+  async approveReel(reelId: string, adminUserId: string) {
+    const reel = await this.prisma.reel.findUnique({
+      where: { id: reelId },
+      select: {
+        id: true,
+        status: true,
+        videoFileId: true,
+        businessId: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!reel) {
+      throw new NotFoundException('Reel not found');
+    }
+
+    if (!reel.videoFileId) {
+      throw new BadRequestException('Reel has no video');
+    }
+
+    const result = await this.prisma.reel.updateMany({
+      where: {
+        id: reelId,
+        status: ReelStatus.PENDING,
+      },
+      data: {
+        status: ReelStatus.APPROVED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException('Only PENDING reel can be approved');
+    }
+
+    return {
+      reelId: reel.id,
+      status: ReelStatus.APPROVED,
+      businessId: reel.businessId,
+      businessName: reel.business.name,
+    };
+  }
+
+  async rejectReel(reelId: string, rejectionReason: string, adminUserId: string) {
+    const reel = await this.prisma.reel.findUnique({
+      where: { id: reelId },
+      select: {
+        id: true,
+        status: true,
+        videoFileId: true,
+        businessId: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!reel) {
+      throw new NotFoundException('Reel not found');
+    }
+
+    if (!reel.videoFileId) {
+      throw new BadRequestException('Reel has no video');
+    }
+
+    const cleanupDate = new Date();
+    cleanupDate.setDate(cleanupDate.getDate() + 30);
+
+    const result = await this.prisma.reel.updateMany({
+      where: {
+        id: reelId,
+        status: ReelStatus.PENDING,
+      },
+      data: {
+        status: ReelStatus.REJECTED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        rejectionReason,
+        cleanupAt: cleanupDate,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException('Only PENDING reel can be rejected');
+    }
+
+    return {
+      reelId: reel.id,
+      status: ReelStatus.REJECTED,
+      businessId: reel.businessId,
+      businessName: reel.business.name,
+    };
   }
 }

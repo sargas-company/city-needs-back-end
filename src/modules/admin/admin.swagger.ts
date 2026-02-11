@@ -2,10 +2,10 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
+import { AdminBusinessDetailDto } from './dto/admin-business-detail.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
-import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { AdminVerificationsResponseDto } from './dto/admin-verifications-response.dto';
 import { DeactivateBusinessResponseDto } from './dto/deactivate-business-response.dto';
 
@@ -35,6 +35,25 @@ export function SwaggerAdminGetBusinesses() {
   );
 }
 
+export function SwaggerAdminGetBusiness() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Get full business details including all verifications (admin only)',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Business details with all verifications',
+      type: AdminBusinessDetailDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Business not found',
+    }),
+  );
+}
+
 export function SwaggerAdminGetVerifications() {
   return applyDecorators(
     ApiTags('Admin'),
@@ -44,23 +63,6 @@ export function SwaggerAdminGetVerifications() {
       status: 200,
       description: 'List of business verifications',
       type: AdminVerificationsResponseDto,
-    }),
-  );
-}
-
-export function SwaggerAdminGetVerification() {
-  return applyDecorators(
-    ApiTags('Admin'),
-    ApiBearerAuth(),
-    ApiOperation({ summary: 'Get business verification by ID (admin only)' }),
-    ApiResponse({
-      status: 200,
-      description: 'Business verification details',
-      type: AdminVerificationDetailDto,
-    }),
-    ApiResponse({
-      status: 404,
-      description: 'Verification not found',
     }),
   );
 }
@@ -162,6 +164,68 @@ export function SwaggerAdminRequestResubmission() {
     ApiResponse({
       status: 400,
       description: 'Only PENDING verification can be moved to RESUBMISSION',
+    }),
+  );
+}
+
+export function SwaggerAdminApproveReel() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Approve business reel (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Reel approved successfully',
+      schema: {
+        example: {
+          success: true,
+          data: {
+            reelId: 'uuid',
+            status: 'APPROVED',
+            businessId: 'uuid',
+            businessName: 'Example Business',
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Reel not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Only PENDING reel can be approved',
+    }),
+  );
+}
+
+export function SwaggerAdminRejectReel() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Reject business reel (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Reel rejected successfully',
+      schema: {
+        example: {
+          success: true,
+          data: {
+            reelId: 'uuid',
+            status: 'REJECTED',
+            businessId: 'uuid',
+            businessName: 'Example Business',
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Reel not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Only PENDING reel can be rejected',
     }),
   );
 }

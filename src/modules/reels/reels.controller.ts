@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Post,
   UploadedFile,
   UseGuards,
@@ -14,10 +15,10 @@ import { memoryStorage } from 'multer';
 
 import { ReelsService } from './reels.service';
 import {
-  SwaggerGetMyReel,
+  SwaggerGetMyReels,
   SwaggerReelsTag,
-  SwaggerUpsertReel,
-  SwaggerDeleteMyReel,
+  SwaggerUploadReel,
+  SwaggerDeleteReel,
 } from './reels.swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { DbUserAuthGuard } from '../../common/guards/db-user-auth.guard';
@@ -25,37 +26,37 @@ import { successResponse } from '../../common/utils/response.util';
 
 @ApiTags('Reels')
 @ApiBearerAuth()
-@Controller('/business/me/reel')
+@Controller('/business/me/reels')
 @SwaggerReelsTag()
 @UseGuards(DbUserAuthGuard)
 export class ReelsController {
   constructor(private readonly reelsService: ReelsService) {}
 
   @Get()
-  @SwaggerGetMyReel()
-  async getMyReel(@CurrentUser() user: User) {
-    const reel = await this.reelsService.getMyReel(user);
-    return successResponse({ reel });
+  @SwaggerGetMyReels()
+  async getMyReels(@CurrentUser() user: User) {
+    const reels = await this.reelsService.getMyReels(user);
+    return successResponse({ reels });
   }
 
   @Post()
   @ApiConsumes('multipart/form-data')
-  @SwaggerUpsertReel()
+  @SwaggerUploadReel()
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 30 * 1024 * 1024, files: 1 },
     }),
   )
-  async uploadOrReplace(@CurrentUser() user: User, @UploadedFile() file: Express.Multer.File) {
-    const reel = await this.reelsService.upsertReel(user, file);
+  async uploadReel(@CurrentUser() user: User, @UploadedFile() file: Express.Multer.File) {
+    const reel = await this.reelsService.createReel(user, file);
     return successResponse({ reel }, 201);
   }
 
-  @Delete()
-  @SwaggerDeleteMyReel()
-  async deleteMyReel(@CurrentUser() user: User) {
-    await this.reelsService.deleteMyReel(user);
+  @Delete(':id')
+  @SwaggerDeleteReel()
+  async deleteReel(@CurrentUser() user: User, @Param('id') id: string) {
+    await this.reelsService.deleteReel(user, id);
     return successResponse({ deleted: true });
   }
 }
