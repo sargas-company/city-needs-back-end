@@ -14,6 +14,7 @@ import {
 } from 'src/common/dto/cursor-pagination.dto';
 import {
   assertInsideWorkInterval,
+  formatToBusinessLocal,
   getBusinessWorkInterval,
   parseLocalDate,
   parseLocalDateTime,
@@ -139,8 +140,8 @@ export class BookingService {
       businessId: booking.businessId,
       userId: booking.userId,
       status: booking.status,
-      startAt: booking.startAt.toISOString(),
-      endAt: booking.endAt.toISOString(),
+      startAt: formatToBusinessLocal(booking.startAt, timeZone),
+      endAt: formatToBusinessLocal(booking.endAt, timeZone),
       totalDurationMinutes,
       serviceIds,
       createdAt: booking.createdAt.toISOString(),
@@ -365,8 +366,8 @@ export class BookingService {
             }
           : null,
         status: b.status,
-        startAt: b.startAt.toISOString(),
-        endAt: b.endAt.toISOString(),
+        startAt: formatToBusinessLocal(b.startAt, business.timeZone),
+        endAt: formatToBusinessLocal(b.endAt, business.timeZone),
         createdAt: b.createdAt.toISOString(),
         services: b.services.map((s) => ({
           id: s.id,
@@ -416,6 +417,7 @@ export class BookingService {
           select: {
             id: true,
             name: true,
+            timeZone: true,
             logo: {
               select: {
                 id: true,
@@ -464,8 +466,8 @@ export class BookingService {
               }
             : null,
           status: b.status,
-          startAt: b.startAt.toISOString(),
-          endAt: b.endAt.toISOString(),
+          startAt: formatToBusinessLocal(b.startAt, b.business.timeZone),
+          endAt: formatToBusinessLocal(b.endAt, b.business.timeZone),
           createdAt: b.createdAt.toISOString(),
           hasReview: Boolean(b.review),
           services,

@@ -76,3 +76,14 @@ export function assertInsideWorkInterval(
     throw new BadRequestException('Selected time is outside business hours');
   }
 }
+
+/**
+ * Converts UTC Date to local business time string in format "yyyy-MM-dd'T'HH:mm"
+ * @param utcDate - Date object in UTC
+ * @param timeZone - Business timezone (e.g., "America/New_York")
+ * @returns Formatted string like "2026-02-13T08:10"
+ */
+export function formatToBusinessLocal(utcDate: Date, timeZone: string): string {
+  const localDateTime = DateTime.fromJSDate(utcDate, { zone: 'utc' }).setZone(timeZone);
+  return localDateTime.toFormat("yyyy-MM-dd'T'HH:mm");
+}
