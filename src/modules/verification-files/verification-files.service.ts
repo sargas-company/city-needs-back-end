@@ -295,6 +295,8 @@ export class VerificationFilesService {
       'image/jpeg',
       'image/png',
       'image/webp',
+      'image/heic',
+      'image/heif',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
@@ -310,6 +312,8 @@ export class VerificationFilesService {
     if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'jpg';
     if (lower.endsWith('.png')) return 'png';
     if (lower.endsWith('.webp')) return 'webp';
+    if (lower.endsWith('.heic')) return 'heic';
+    if (lower.endsWith('.heif')) return 'heif';
     if (lower.endsWith('.pdf')) return 'pdf';
     if (lower.endsWith('.doc')) return 'doc';
     if (lower.endsWith('.docx')) return 'docx';
@@ -318,6 +322,8 @@ export class VerificationFilesService {
     if (mime === 'image/jpeg') return 'jpg';
     if (mime === 'image/png') return 'png';
     if (mime === 'image/webp') return 'webp';
+    if (mime === 'image/heic') return 'heic';
+    if (mime === 'image/heif') return 'heif';
     if (mime === 'application/pdf') return 'pdf';
     if (mime === 'application/msword') return 'doc';
     if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')

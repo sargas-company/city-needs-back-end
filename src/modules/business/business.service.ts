@@ -16,6 +16,8 @@ import {
   Prisma,
   User,
 } from '@prisma/client';
+import convert from 'heic-convert';
+import sharp from 'sharp';
 import { BusinessHoursService } from 'src/modules/business-hours/business-hours.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
@@ -49,47 +51,83 @@ export class BusinessService {
       throw new BadRequestException('File is required');
     }
 
-    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    if (!allowed.has(file.mimetype)) {
-      throw new BadRequestException(`Invalid file type: ${file.mimetype}`);
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+    if (!allowedMimeTypes.has(file.mimetype)) {
+      throw new BadRequestException('Invalid logo file type');
     }
 
     const business = await this.getBusinessOrThrow(user);
 
-    const ext = this.guessExt(file.mimetype, file.originalname);
-    const storageKey = `public/business/${business.id}/logo/${randomUUID()}${ext ? `.${ext}` : ''}`;
+    // Load current logo before anything else
+    const businessWithLogo = await this.prisma.business.findUnique({
+      where: { id: business.id },
+      select: {
+        logoId: true,
+        logo: { select: { id: true, storageKey: true } },
+      },
+    });
+
+    if (!businessWithLogo) {
+      throw new NotFoundException('Business not found');
+    }
+
+    const oldLogoId = businessWithLogo.logo?.id ?? null;
+    const oldLogoStorageKey = businessWithLogo.logo?.storageKey ?? null;
+
+    // Prepare buffer for processing
+    let processBuffer = file.buffer;
+
+    // Convert HEIC/HEIF to JPEG first (sharp doesn't support them natively)
+    if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
+      try {
+        const jpegBuffer = await convert({
+          buffer: file.buffer as unknown as ArrayBufferLike,
+          format: 'JPEG',
+          quality: 1,
+        });
+        processBuffer = Buffer.from(jpegBuffer);
+      } catch {
+        // heic-convert failed, will attempt to process with sharp directly
+        void 0;
+      }
+    }
+
+    // Convert image to WebP for universal browser support
+    const webpBuffer = await sharp(processBuffer)
+      .webp({ quality: 85 })
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .toBuffer()
+      .catch(() => {
+        throw new BadRequestException(
+          'Unable to process image. Please use JPEG, PNG, WebP, HEIC, or HEIF format.',
+        );
+      });
+
+    // Upload new logo to S3 as WebP
+    const storageKey = `public/business/${business.id}/logo/${randomUUID()}.webp`;
 
     const uploaded = await this.storageService.uploadPublic({
       storageKey,
-      contentType: file.mimetype,
-      body: file.buffer,
+      contentType: 'image/webp',
+      body: webpBuffer,
     });
 
-    let oldStorageKey: string | null = null;
-    let result: { id: string; url: string };
-
     try {
-      await this.prisma.$transaction(async (tx) => {
-        const current = await tx.business.findUnique({
-          where: { id: business.id },
-          select: {
-            logoId: true,
-            logo: { select: { storageKey: true } },
-          },
-        });
-
-        if (current?.logoId) {
-          oldStorageKey = current.logo?.storageKey ?? null;
-          await tx.file.delete({ where: { id: current.logoId } });
-        }
-
-        const newFile = await tx.file.create({
+      // Replace logo in DB (transaction)
+      const newFile = await this.prisma.$transaction(async (tx) => {
+        const createdFile = await tx.file.create({
           data: {
             url: uploaded.publicUrl,
             storageKey: uploaded.storageKey,
             type: FileType.BUSINESS_LOGO,
-            mimeType: file.mimetype,
-            sizeBytes: file.size,
+            mimeType: 'image/webp',
+            sizeBytes: webpBuffer.length,
             originalName: file.originalname,
             businessId: null,
           },
@@ -97,37 +135,32 @@ export class BusinessService {
 
         await tx.business.update({
           where: { id: business.id },
-          data: { logoId: newFile.id },
+          data: { logoId: createdFile.id },
         });
 
-        result = {
-          id: newFile.id,
-          url: uploaded.publicUrl,
-        };
+        if (oldLogoId) {
+          await tx.file.delete({
+            where: { id: oldLogoId },
+          });
+        }
+
+        return createdFile;
       });
+
+      // delete old logo from S3 (AFTER DB commit)
+      if (oldLogoStorageKey) {
+        this.storageService.deleteObject(oldLogoStorageKey).catch(() => undefined);
+      }
+
+      return {
+        id: newFile.id,
+        url: uploaded.publicUrl,
+      };
     } catch (err) {
+      // Rollback uploaded file if DB failed
       await this.storageService.deleteObject(uploaded.storageKey).catch(() => undefined);
       throw err;
     }
-
-    if (oldStorageKey) {
-      this.storageService.deleteObject(oldStorageKey).catch(() => undefined);
-    }
-
-    return result!;
-  }
-
-  private guessExt(mime: string, originalName: string): string | null {
-    const lower = originalName.toLowerCase();
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'jpg';
-    if (lower.endsWith('.png')) return 'png';
-    if (lower.endsWith('.webp')) return 'webp';
-
-    if (mime === 'image/jpeg') return 'jpg';
-    if (mime === 'image/png') return 'png';
-    if (mime === 'image/webp') return 'webp';
-
-    return null;
   }
 
   async updateProfile(user: User, dto: UpdateBusinessProfileDto): Promise<BusinessProfileDto> {

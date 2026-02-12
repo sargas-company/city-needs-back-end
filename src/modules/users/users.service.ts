@@ -9,6 +9,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { FileType, User } from '@prisma/client';
+import convert from 'heic-convert';
+import sharp from 'sharp';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
 
@@ -32,7 +34,13 @@ export class UsersService {
       throw new BadRequestException('Avatar file is required');
     }
 
-    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
     if (!allowedMimeTypes.has(file.mimetype)) {
       throw new BadRequestException('Invalid avatar file type');
     }
@@ -50,14 +58,42 @@ export class UsersService {
     const oldAvatarId = userWithAvatar.avatar?.id ?? null;
     const oldAvatarStorageKey = userWithAvatar.avatar?.storageKey ?? null;
 
-    // Upload new avatar to S3
-    const ext = this.guessExt(file.mimetype);
-    const storageKey = `public/users/${user.id}/avatar/${randomUUID()}.${ext}`;
+    // Prepare buffer for processing
+    let processBuffer = file.buffer;
+
+    // Convert HEIC/HEIF to JPEG first (sharp doesn't support them natively)
+    if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
+      try {
+        const jpegBuffer = await convert({
+          buffer: file.buffer as unknown as ArrayBufferLike,
+          format: 'JPEG',
+          quality: 1,
+        });
+        processBuffer = Buffer.from(jpegBuffer);
+      } catch {
+        // heic-convert failed, will attempt to process with sharp directly
+        void 0;
+      }
+    }
+
+    // Convert image to WebP for universal browser support
+    const webpBuffer = await sharp(processBuffer)
+      .webp({ quality: 85 })
+      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+      .toBuffer()
+      .catch(() => {
+        throw new BadRequestException(
+          'Unable to process image. Please use JPEG, PNG, WebP, HEIC, or HEIF format.',
+        );
+      });
+
+    // Upload new avatar to S3 as WebP
+    const storageKey = `public/users/${user.id}/avatar/${randomUUID()}.webp`;
 
     const uploaded = await this.storage.uploadPublic({
       storageKey,
-      contentType: file.mimetype,
-      body: file.buffer,
+      contentType: 'image/webp',
+      body: webpBuffer,
     });
 
     try {
@@ -68,8 +104,8 @@ export class UsersService {
             url: uploaded.publicUrl,
             storageKey: uploaded.storageKey,
             type: FileType.AVATAR,
-            mimeType: file.mimetype,
-            sizeBytes: file.size,
+            mimeType: 'image/webp',
+            sizeBytes: webpBuffer.length,
             originalName: file.originalname,
           },
         });
@@ -186,13 +222,6 @@ export class UsersService {
     });
 
     return updated;
-  }
-
-  private guessExt(mime: string): string {
-    if (mime === 'image/jpeg') return 'jpg';
-    if (mime === 'image/png') return 'png';
-    if (mime === 'image/webp') return 'webp';
-    return 'bin';
   }
 
   private async firebaseUpdateEmail(uid: string, email: string) {

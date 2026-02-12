@@ -9,6 +9,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { FileType, Prisma, UploadItemKind, UploadSessionStatus, User } from '@prisma/client';
+import convert from 'heic-convert';
+import sharp from 'sharp';
 
 import { UploadFileDto } from './dto/upload-file.dto';
 import { UploadSessionDto, UploadSessionFileDto } from './dto/upload-session.dto';
@@ -101,17 +103,57 @@ export class UploadSessionsService {
       throw new BadRequestException(`Max ${this.MAX_DOCUMENTS} documents allowed`);
     }
 
+    // Process images (LOGO and PHOTO) - convert to WebP
+    let processedBuffer = file.buffer;
+    let finalMimeType = file.mimetype;
+    let finalExt = this.guessExt(file.mimetype, file.originalname);
+
+    if (dto.kind === UploadItemKind.LOGO || dto.kind === UploadItemKind.PHOTO) {
+      // Prepare buffer for processing
+      let imageBuffer = file.buffer;
+
+      // Convert HEIC/HEIF to JPEG first (sharp doesn't support them natively)
+      if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
+        try {
+          const jpegBuffer = await convert({
+            buffer: file.buffer as unknown as ArrayBufferLike,
+            format: 'JPEG',
+            quality: 1,
+          });
+          imageBuffer = Buffer.from(jpegBuffer);
+        } catch {
+          // heic-convert failed, will attempt to process with sharp directly
+          void 0;
+        }
+      }
+
+      // Convert image to WebP for universal browser support
+      const resizeSize = dto.kind === UploadItemKind.LOGO ? 1200 : 1600;
+      const webpBuffer = await sharp(imageBuffer)
+        .webp({ quality: 85 })
+        .resize(resizeSize, resizeSize, { fit: 'inside', withoutEnlargement: true })
+        .toBuffer()
+        .catch(() => {
+          throw new BadRequestException(
+            'Unable to process image. Please use JPEG, PNG, WebP, HEIC, or HEIF format.',
+          );
+        });
+
+      processedBuffer = webpBuffer;
+      finalMimeType = 'image/webp';
+      finalExt = 'webp';
+    }
+
     // Build storageKey
-    const ext = this.guessExt(file.mimetype, file.originalname);
     const objectId = cryptoRandomUuid();
     const prefix = this.prefixForKind(dto.kind);
-    const storageKey = `${prefix}business/${businessId}/${this.kindFolder(dto.kind)}/${objectId}${ext ? `.${ext}` : ''}`;
+    const storageKey = `${prefix}business/${businessId}/${this.kindFolder(dto.kind)}/${objectId}${finalExt ? `.${finalExt}` : ''}`;
 
     // Upload to S3
     const uploaded = await this.storage.uploadPublic({
       storageKey,
-      contentType: file.mimetype,
-      body: file.buffer,
+      contentType: finalMimeType,
+      body: processedBuffer,
     });
 
     try {
@@ -141,8 +183,8 @@ export class UploadSessionsService {
             url: uploaded.publicUrl,
             storageKey: uploaded.storageKey,
             type: this.fileTypeForKind(dto.kind),
-            mimeType: file.mimetype,
-            sizeBytes: file.size,
+            mimeType: finalMimeType,
+            sizeBytes: processedBuffer.length,
             originalName: file.originalname,
             businessId: null,
           },
@@ -266,7 +308,13 @@ export class UploadSessionsService {
       throw new BadRequestException(`Max file size is ${this.MAX_FILE_SIZE_MB}MB`);
     }
 
-    const allowedImages = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    const allowedImages = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
     const allowedDocs = new Set([
       'application/pdf',
 
