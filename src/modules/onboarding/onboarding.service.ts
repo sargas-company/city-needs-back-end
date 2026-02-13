@@ -613,7 +613,8 @@ export class OnboardingService {
       data: { status: shouldBePending ? BusinessStatus.PENDING : BusinessStatus.ACTIVE },
     });
 
-    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: null } });
+    const newOnboardingStep = shouldBePending ? 4 : null;
+    await tx.user.update({ where: { id: user.id }, data: { onboardingStep: newOnboardingStep } });
   }
 
   // Helpers

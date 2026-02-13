@@ -820,6 +820,17 @@ export class AdminService {
         });
       }
 
+      const owner = await tx.user.findFirst({
+        where: { id: verification.business.ownerUserId },
+      });
+
+      if (owner && owner.onboardingStep === 4) {
+        await tx.user.update({
+          where: { id: owner.id },
+          data: { onboardingStep: null },
+        });
+      }
+
       // 3. response
       return {
         verificationId: verification.id,
