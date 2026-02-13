@@ -25,6 +25,9 @@ export class BookingListItemDto {
   @ApiPropertyOptional({ type: BusinessLogoDto, nullable: true })
   businessLogo!: BusinessLogoDto | null;
 
+  @ApiPropertyOptional({ example: '+1234567890', nullable: true })
+  businessPhone!: string | null;
+
   @ApiProperty({ enum: BookingStatus })
   status!: BookingStatus;
 

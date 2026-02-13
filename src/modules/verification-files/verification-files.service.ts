@@ -163,12 +163,40 @@ export class VerificationFilesService {
     });
     if (!business) throw new ForbiddenException('Business is required for this action');
 
-    // Return only draft files (not attached to any verification)
-    const file = await this.prisma.file.findFirst({
+    // 1. First check for submitted verification (file attached to verification)
+    const verification = await this.prisma.businessVerification.findFirst({
+      where: { businessId: business.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        verificationFile: true,
+      },
+    });
+
+    if (verification?.verificationFile) {
+      const file = verification.verificationFile;
+      return {
+        id: file.id,
+        url: file.url,
+        type: file.type,
+        originalName: file.originalName ?? null,
+        mimeType: file.mimeType ?? null,
+        sizeBytes: file.sizeBytes ?? null,
+        createdAt: file.createdAt,
+        lock: {
+          id: verification.id,
+          status: verification.status,
+          rejectionReason: verification.rejectionReason ?? null,
+          reviewedAt: verification.reviewedAt ?? null,
+        },
+      };
+    }
+
+    // 2. Fallback — draft file (not yet submitted)
+    const draftFile = await this.prisma.file.findFirst({
       where: {
         businessId: business.id,
         type: FileType.BUSINESS_VERIFICATION_DOCUMENT,
-        verification: null, // Only draft files
+        verification: null,
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -182,16 +210,17 @@ export class VerificationFilesService {
       },
     });
 
-    if (!file) return null;
+    if (!draftFile) return null;
 
     return {
-      id: file.id,
-      url: file.url,
-      type: file.type,
-      originalName: file.originalName ?? null,
-      mimeType: file.mimeType ?? null,
-      sizeBytes: file.sizeBytes ?? null,
-      createdAt: file.createdAt,
+      id: draftFile.id,
+      url: draftFile.url,
+      type: draftFile.type,
+      originalName: draftFile.originalName ?? null,
+      mimeType: draftFile.mimeType ?? null,
+      sizeBytes: draftFile.sizeBytes ?? null,
+      createdAt: draftFile.createdAt,
+      lock: null,
     };
   }
 

@@ -18,14 +18,21 @@ import { SkipBusinessVerification } from 'src/common/decorators/skip-business-ve
 import { DbUserAuthGuard } from 'src/common/guards/db-user-auth.guard';
 import { successResponse } from 'src/common/utils/response.util';
 
-import { CurrentVerificationFileDto } from './dto/current-verification-file.dto';
+import {
+  CurrentVerificationFileDto,
+  VerificationLockDto,
+} from './dto/current-verification-file.dto';
 import { GetCurrentVerificationFileResponseDto } from './dto/get-current-verification-file.response.dto';
 import { VerificationFilesService } from './verification-files.service';
 import { SwaggerGetCurrentVerificationFile } from './verification-files.swagger';
 
 @ApiTags('Verification Files')
 @ApiBearerAuth()
-@ApiExtraModels(CurrentVerificationFileDto, GetCurrentVerificationFileResponseDto)
+@ApiExtraModels(
+  CurrentVerificationFileDto,
+  VerificationLockDto,
+  GetCurrentVerificationFileResponseDto,
+)
 @Controller('/onboarding/verification-file')
 @UseGuards(DbUserAuthGuard)
 @SkipBusinessVerification()

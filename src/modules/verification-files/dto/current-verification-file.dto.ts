@@ -1,5 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { FileType } from '@prisma/client';
+import { BusinessVerificationStatus, FileType } from '@prisma/client';
+
+export class VerificationLockDto {
+  @ApiProperty({ example: 'uuid-verification-id' })
+  id!: string;
+
+  @ApiProperty({ enum: BusinessVerificationStatus, example: BusinessVerificationStatus.PENDING })
+  status!: BusinessVerificationStatus;
+
+  @ApiPropertyOptional({ example: 'Document is not readable', nullable: true })
+  rejectionReason!: string | null;
+
+  @ApiPropertyOptional({ example: '2025-12-18T12:00:00.000Z', nullable: true })
+  reviewedAt!: Date | null;
+}
 
 export class CurrentVerificationFileDto {
   @ApiProperty({ example: 'uuid-file-id' })
@@ -22,4 +36,7 @@ export class CurrentVerificationFileDto {
 
   @ApiProperty({ example: '2025-12-18T12:00:00.000Z' })
   createdAt!: Date;
+
+  @ApiPropertyOptional({ type: () => VerificationLockDto, nullable: true })
+  lock!: VerificationLockDto | null;
 }

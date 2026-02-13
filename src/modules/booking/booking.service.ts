@@ -417,6 +417,7 @@ export class BookingService {
           select: {
             id: true,
             name: true,
+            phone: true,
             timeZone: true,
             logo: {
               select: {
@@ -465,6 +466,7 @@ export class BookingService {
                 url: b.business.logo.url,
               }
             : null,
+          businessPhone: b.business.phone,
           status: b.status,
           startAt: formatToBusinessLocal(b.startAt, b.business.timeZone),
           endAt: formatToBusinessLocal(b.endAt, b.business.timeZone),
