@@ -6,7 +6,446 @@ datasource db {
   provider = "postgresql"
 }
 
-// ENUMS
+model User {
+  id                          String           @id @default(uuid())
+  authExternalId              String           @unique
+  email                       String?          @unique
+  phone                       String?          @unique
+  username                    String?
+  avatarId                    String?          @unique @map("avatar")
+  role                        UserRole?
+  status                      UserStatus       @default(ACTIVE)
+  emailVerified               Boolean          @default(false)
+  lastVerificationEmailSentAt DateTime?
+  onboardingStep              Int?
+  addressId                   String?          @unique
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @updatedAt
+  analyticsEvents             AnalyticsEvent[]
+  bookings                    Booking[]
+  business                    Business?        @relation("UserBusiness")
+  location                    Location?
+  reviews                     Review[]
+  savedBusinesses             SavedBusiness[]
+  categories                  UserCategory[]
+  address                     Address?         @relation("UserAddress", fields: [addressId], references: [id])
+  avatar                      File?            @relation("UserAvatar", fields: [avatarId], references: [id])
+
+  @@map("users")
+}
+
+model Location {
+  id               String         @id @default(uuid())
+  lat              Float
+  lng              Float
+  source           LocationSource
+  provider         String?
+  placeId          String?
+  formattedAddress String?        @db.VarChar(255)
+  userId           String?        @unique
+  businessId       String?        @unique
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  business         Business?      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user             User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([lat, lng])
+  @@map("locations")
+}
+
+model Business {
+  id                          String                 @id @default(uuid())
+  ownerUserId                 String                 @unique
+  name                        String
+  description                 String
+  phone                       String
+  email                       String
+  price                       Int
+  serviceOnSite               Boolean                @default(true)
+  serviceInStudio             Boolean                @default(true)
+  addressId                   String?                @unique
+  logoId                      String?                @unique @map("logo")
+  status                      BusinessStatus         @default(PENDING)
+  ratingAvg                   Float                  @default(0)
+  ratingCount                 Int                    @default(0)
+  categoryId                  String
+  verificationGraceDeadlineAt DateTime?
+  timeZone                    String                 @default("America/Regina")
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
+  analyticsEvents             AnalyticsEvent[]
+  billingCustomer             BillingCustomer?
+  billingSubscriptions        BillingSubscription[]
+  bookings                    Booking[]
+  businessHours               BusinessHour[]
+  services                    BusinessService[]
+  verifications               BusinessVerification[]
+  address                     Address?               @relation("BusinessAddress", fields: [addressId], references: [id])
+  category                    Category               @relation("BusinessCategory", fields: [categoryId], references: [id])
+  logo                        File?                  @relation("BusinessLogo", fields: [logoId], references: [id])
+  owner                       User                   @relation("UserBusiness", fields: [ownerUserId], references: [id])
+  files                       File[]                 @relation("BusinessFiles")
+  location                    Location?
+  reels                       Reel[]
+  reviews                     Review[]
+  savedByUsers                SavedBusiness[]
+  uploadSessions              UploadSession[]
+
+  @@index([categoryId])
+  @@index([status, categoryId])
+  @@index([status])
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "business_name_trgm_idx", type: Gin)
+  @@map("businesses")
+}
+
+model BusinessService {
+  id              String                @id @default(uuid())
+  businessId      String
+  name            String
+  price           Int
+  duration        Int
+  status          BusinessServiceStatus @default(ACTIVE)
+  position        Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  bookingServices BookingService[]
+  business        Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([businessId, status, price])
+  @@index([price])
+  @@map("business_services")
+}
+
+model SavedBusiness {
+  id         String   @id @default(uuid())
+  userId     String
+  businessId String
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
+  @@map("saved_businesses")
+}
+
+model BusinessHour {
+  id         String    @id @default(uuid())
+  businessId String
+  weekday    Int
+  startTime  DateTime? @db.Time(6)
+  endTime    DateTime? @db.Time(6)
+  isClosed   Boolean   @default(false)
+  is24h      Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([weekday])
+  @@index([businessId, weekday])
+  @@map("business_hours")
+}
+
+model Booking {
+  id           String           @id @default(uuid())
+  businessId   String
+  userId       String
+  startAt      DateTime
+  endAt        DateTime
+  status       BookingStatus    @default(PENDING)
+  cancelledAt  DateTime?
+  cancelledBy  UserRole?
+  cancelReason String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  services     BookingService[]
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review       Review?
+
+  @@index([businessId, startAt, endAt])
+  @@index([userId])
+  @@index([status])
+  @@index([businessId, status, createdAt])
+  @@map("bookings")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  businessId String
+  userId     String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([userId])
+  @@index([createdAt, id])
+  @@map("reviews")
+}
+
+model BookingService {
+  id        String          @id @default(uuid())
+  bookingId String
+  serviceId String
+  name      String
+  price     Int
+  duration  Int
+  createdAt DateTime        @default(now())
+  booking   Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service   BusinessService @relation(fields: [serviceId], references: [id])
+
+  @@index([bookingId])
+  @@map("booking_services")
+}
+
+model BusinessVerification {
+  id                 String                     @id @default(uuid())
+  businessId         String
+  status             BusinessVerificationStatus @default(PENDING)
+  verificationFileId String                     @unique
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  reviewedByAdminId  String?
+  rejectionReason    String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  business           Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  verificationFile   File                       @relation("VerificationFile", fields: [verificationFileId], references: [id])
+
+  @@index([businessId, status])
+  @@map("business_verifications")
+}
+
+model Address {
+  id           String    @id @default(uuid())
+  countryCode  String
+  city         String
+  state        String
+  addressLine1 String
+  addressLine2 String?
+  zip          String?
+  business     Business? @relation("BusinessAddress")
+  user         User?     @relation("UserAddress")
+
+  @@index([city])
+  @@map("addresses")
+}
+
+model Category {
+  id                   String         @id @default(uuid())
+  title                String         @unique
+  slug                 String         @unique
+  description          String?
+  requiresVerification Boolean        @default(false)
+  gracePeriodHours     Int?
+  businesses           Business[]     @relation("BusinessCategory")
+  userCategories       UserCategory[]
+
+  @@map("categories")
+}
+
+model UserCategory {
+  userId     String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, categoryId])
+  @@map("user_categories")
+}
+
+model File {
+  id           String                @id @default(uuid())
+  url          String
+  storageKey   String?               @unique
+  type         FileType
+  mimeType     String?
+  sizeBytes    Int?
+  originalName String?
+  businessId   String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  verification BusinessVerification? @relation("VerificationFile")
+  logoBusiness Business?             @relation("BusinessLogo")
+  business     Business?             @relation("BusinessFiles", fields: [businessId], references: [id], onDelete: Cascade)
+  reel         Reel?                 @relation("ReelVideo")
+  sessionItems UploadSessionItem[]
+  userAvatar   User?                 @relation("UserAvatar")
+
+  @@map("files")
+}
+
+model UploadSession {
+  id         String              @id @default(uuid())
+  businessId String
+  status     UploadSessionStatus @default(DRAFT)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  items      UploadSessionItem[]
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@map("upload_sessions")
+}
+
+model UploadSessionItem {
+  id        String         @id @default(uuid())
+  sessionId String
+  fileId    String
+  kind      UploadItemKind
+  createdAt DateTime       @default(now())
+  file      File           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  session   UploadSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, fileId])
+  @@index([sessionId, kind])
+  @@index([fileId])
+  @@map("upload_session_items")
+}
+
+model BillingCustomer {
+  id               String   @id @default(uuid())
+  businessId       String   @unique
+  stripeCustomerId String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("billing_customers")
+}
+
+model BillingProduct {
+  id              String             @id @default(uuid())
+  stripeProductId String             @unique
+  name            String
+  description     String?
+  active          Boolean            @default(true)
+  kind            BillingProductKind @default(SUBSCRIPTION)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  prices          BillingPrice[]
+
+  @@map("billing_products")
+}
+
+model BillingPrice {
+  id            String                @id @default(uuid())
+  stripePriceId String                @unique
+  productId     String
+  nickname      String?
+  amount        Int
+  currency      String                @default("CAD")
+  interval      String
+  intervalCount Int                   @default(1)
+  taxInclusive  Boolean               @default(false)
+  sortOrder     Int                   @default(0)
+  active        Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  product       BillingProduct        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  subscriptions BillingSubscription[]
+
+  @@index([interval, intervalCount])
+  @@map("billing_prices")
+}
+
+model BillingSubscription {
+  id                   String                    @id @default(uuid())
+  businessId           String
+  stripeSubscriptionId String                    @unique
+  stripeCustomerId     String
+  priceId              String
+  status               BillingSubscriptionStatus
+  currentPeriodStartAt DateTime
+  currentPeriodEndAt   DateTime
+  cancelAtPeriodEnd    Boolean                   @default(false)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  invoices             BillingInvoice[]
+  business             Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  price                BillingPrice              @relation(fields: [priceId], references: [id])
+
+  @@index([businessId])
+  @@index([status])
+  @@map("billing_subscriptions")
+}
+
+model BillingInvoice {
+  id               String               @id @default(uuid())
+  stripeInvoiceId  String               @unique
+  subscriptionId   String?
+  amountDue        Int
+  amountPaid       Int
+  currency         String               @default("CAD")
+  status           BillingInvoiceStatus
+  hostedInvoiceUrl String?
+  invoicePdfUrl    String?
+  issuedAt         DateTime
+  paidAt           DateTime?
+  createdAt        DateTime             @default(now())
+  subscription     BillingSubscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([status])
+  @@map("billing_invoices")
+}
+
+model StripeWebhookEvent {
+  id            String    @id @default(uuid())
+  stripeEventId String    @unique
+  type          String
+  processed     Boolean   @default(false)
+  processedAt   DateTime?
+  payload       Json
+  createdAt     DateTime  @default(now())
+
+  @@index([type])
+  @@map("stripe_webhook_events")
+}
+
+model Reel {
+  id          String   @id @default(uuid())
+  businessId  String
+  videoFileId String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  video       File     @relation("ReelVideo", fields: [videoFileId], references: [id])
+
+  @@index([businessId])
+  @@index([createdAt, id])
+  @@map("reels")
+}
+
+model AnalyticsEvent {
+  id           String               @id @default(uuid())
+  businessId   String
+  viewerUserId String
+  type         AnalyticsEventType
+  actionType   AnalyticsActionType?
+  source       AnalyticsSource
+  createdAt    DateTime             @default(now())
+  business     Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  viewer       User                 @relation(fields: [viewerUserId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, createdAt])
+  @@index([businessId, type])
+  @@index([businessId, type, createdAt])
+  @@index([businessId, actionType])
+  @@index([businessId, source])
+  @@map("analytics_events")
+}
 
 enum UserRole {
   END_USER
@@ -113,515 +552,9 @@ enum AnalyticsSource {
   REELS
 }
 
-// MODELS
-
-model User {
-  id             String      @id @default(uuid())
-  authExternalId String      @unique
-  email          String?     @unique
-  phone          String?     @unique
-  username       String?
-  avatarId       String?     @map("avatar") @unique
-  avatar         File?       @relation("UserAvatar", fields: [avatarId], references: [id])
-  role           UserRole?
-  status         UserStatus  @default(ACTIVE)
-  emailVerified               Boolean   @default(false)
-  lastVerificationEmailSentAt DateTime?
-  onboardingStep Int?
-  addressId String? @unique
-  address   Address? @relation("UserAddress", fields: [addressId], references: [id])
-  business  Business? @relation("UserBusiness")
-  reviews     Review[]
-  categories UserCategory[]
-  location   Location?
-  bookings        Booking[]
-  savedBusinesses SavedBusiness[]
-  analyticsEvents AnalyticsEvent[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  @@map("users")
-}
-
-model Location {
-  id        String   @id @default(uuid())
-
-  lat       Float
-  lng       Float
-
-  source    LocationSource
-  provider  String?
-  placeId   String?
-
-  userId     String? @unique
-  user       User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  businessId String? @unique
-  business   Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([lat, lng])
-  @@map("locations")
-}
-
-model Business {
-  id          String         @id @default(uuid())
-  ownerUserId String         @unique
-  owner       User           @relation("UserBusiness", fields: [ownerUserId], references: [id])
-  name        String
-  description String
-  phone       String
-  email       String
-  price       Int
-  serviceOnSite   Boolean @default(true)
-  serviceInStudio Boolean @default(true)
-  addressId   String?        @unique
-  address     Address?       @relation("BusinessAddress", fields: [addressId], references: [id])
-  logoId      String?        @map("logo") @unique
-  logo        File?          @relation("BusinessLogo", fields: [logoId], references: [id])
-  status      BusinessStatus @default(PENDING)
-  ratingAvg   Float @default(0)
-  ratingCount Int   @default(0)
-  reviews     Review[]
-  categoryId  String
-  category    Category       @relation("BusinessCategory", fields: [categoryId], references: [id])
-  verificationGraceDeadlineAt DateTime?
-  timeZone    String   @default("America/Regina")
-  files       File[]   @relation("BusinessFiles")
-  reels       Reel[]
-  location Location?
-  uploadSessions UploadSession[]
-  verifications  BusinessVerification[]
-  businessHours BusinessHour[]
-  services BusinessService[]
-  bookings   Booking[]
-  savedByUsers SavedBusiness[]
-  billingCustomer BillingCustomer?
-  billingSubscriptions BillingSubscription[]
-  analyticsEvents AnalyticsEvent[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  @@index([categoryId])
-  @@index([status, categoryId])
-  @@index([status])
-  @@map("businesses")
-}
-
-model BusinessService {
-  id         String   @id @default(uuid())
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  name       String
-  price      Int
-  duration   Int
-
-  status     BusinessServiceStatus @default(ACTIVE)
-  position   Int                  @default(0)
-  bookingServices BookingService[]
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([businessId, status])
-  @@index([businessId, status, price])
-  @@index([price])
-  @@map("business_services")
-}
-
-model SavedBusiness {
-  id         String   @id @default(uuid())
-  userId     String
-  businessId String
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([userId, businessId])
-  @@index([userId])
-  @@index([businessId])
-  @@map("saved_businesses")
-}
-
-model BusinessHour {
-  id         String   @id @default(uuid())
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  weekday    Int
-  startTime  DateTime? @db.Time
-  endTime    DateTime? @db.Time
-  isClosed   Boolean  @default(false)
-  is24h      Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([weekday])
-  @@index([businessId, weekday])
-  @@map("business_hours")
-}
-
-model Booking {
-  id         String   @id @default(uuid())
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  startAt    DateTime
-  endAt      DateTime
-
-  status     BookingStatus @default(PENDING)
-
-  cancelledAt DateTime?
-  cancelledBy UserRole?
-  cancelReason String?
-
-  services   BookingService[]
-  review     Review?
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([businessId, startAt, endAt])
-  @@index([userId])
-  @@index([status])
-  @@index([businessId, status, createdAt])
-  @@map("bookings")
-}
-
-model Review {
-  id         String   @id @default(uuid())
-
-  bookingId  String   @unique
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  rating     Int
-  comment    String?
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([userId])
-  @@index([createdAt, id])
-  @@map("reviews")
-}
-
-model BookingService {
-  id         String @id @default(uuid())
-
-  bookingId String
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  serviceId String
-  service   BusinessService @relation(fields: [serviceId], references: [id])
-
-  name      String
-  price     Int
-  duration  Int
-
-  createdAt DateTime @default(now())
-
-  @@index([bookingId])
-  @@map("booking_services")
-}
-
-model BusinessVerification {
-  id                String         @id @default(uuid())
-  businessId         String
-  business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  status             BusinessVerificationStatus @default(PENDING)
-  verificationFileId String         @unique
-  verificationFile   File           @relation("VerificationFile", fields: [verificationFileId], references: [id], onDelete: Restrict)
-  submittedAt        DateTime?
-  reviewedAt         DateTime?
-  reviewedByAdminId  String?
-  rejectionReason    String?
-  resubmissionReason String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-
-  @@index([businessId, status])
-  @@map("business_verifications")
-}
-
-model Address {
-  id           String   @id @default(uuid())
-  countryCode  String 
-  city         String
-  state        String
-  addressLine1 String
-  addressLine2 String?
-  zip          String?
-  user     User?     @relation("UserAddress")
-  business Business? @relation("BusinessAddress")
-
-  @@index([city])
-  @@map("addresses")
-}
-
-model Category {
-  id          String  @id @default(uuid())
-  title       String  @unique
-  slug        String  @unique
-  description String?
-  requiresVerification Boolean @default(false)
-  gracePeriodHours     Int?
-  userCategories UserCategory[]
-  businesses Business[] @relation("BusinessCategory")
-
-  @@map("categories")
-}
-
-model UserCategory {
-  userId     String
-  categoryId String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@id([userId, categoryId])
-  @@map("user_categories")
-}
-
-model File {
-  id           String   @id @default(uuid())
-  url          String
-  storageKey   String?  @unique
-  type         FileType
-  mimeType     String?
-  sizeBytes    Int?
-  originalName String?
-  businessId   String?
-  business     Business? @relation("BusinessFiles", fields: [businessId], references: [id], onDelete: Cascade)
-  logoBusiness Business? @relation("BusinessLogo")
-  userAvatar   User?     @relation("UserAvatar")
-  verification BusinessVerification? @relation("VerificationFile")
-  sessionItems UploadSessionItem[]
-  reel         Reel?    @relation("ReelVideo")
-
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  @@map("files")
-}
-
-model UploadSession {
-  id         String              @id @default(uuid())
-  businessId String
-  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  status     UploadSessionStatus @default(DRAFT)
-
-  items      UploadSessionItem[]
-
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-
-  @@index([businessId, status])
-  @@map("upload_sessions")
-}
-
-model UploadSessionItem {
-  id        String        @id @default(uuid())
-  sessionId String
-  fileId    String
-  kind      UploadItemKind
-
-  session   UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  file      File          @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime      @default(now())
-
-  @@unique([sessionId, fileId])
-  @@index([sessionId, kind])
-  @@index([fileId])
-
-  @@map("upload_session_items")
-}
-
-model BillingCustomer {
-  id               String   @id @default(uuid())
-
-  businessId       String   @unique
-  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  stripeCustomerId String   @unique
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("billing_customers")
-}
-
-model BillingProduct {
-  id              String   @id @default(uuid())
-  stripeProductId String   @unique
-  name            String
-  description     String?
-  active          Boolean  @default(true)
-  prices          BillingPrice[]
-  kind            BillingProductKind @default(SUBSCRIPTION)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("billing_products")
-}
-
-model BillingPrice {
-  id             String   @id @default(uuid())
-
-  stripePriceId  String   @unique
-  productId      String
-  product        BillingProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  nickname       String?
-  amount         Int
-  currency       String   @default("CAD")
-
-  interval       String
-  intervalCount  Int      @default(1)
-
-  taxInclusive   Boolean  @default(false)
-
-  sortOrder      Int      @default(0)
-  active         Boolean  @default(true)
-
-  subscriptions BillingSubscription[]
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([interval, intervalCount])
-  @@map("billing_prices")
-}
-
-model BillingSubscription {
-  id                   String   @id @default(uuid())
-
-  businessId            String
-  business              Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  stripeSubscriptionId  String   @unique
-  stripeCustomerId      String
-
-  priceId               String
-  price                 BillingPrice @relation(fields: [priceId], references: [id])
-
-  status                BillingSubscriptionStatus
-
-  currentPeriodStartAt  DateTime
-  currentPeriodEndAt    DateTime
-
-  cancelAtPeriodEnd     Boolean  @default(false)
-
-  invoices BillingInvoice[]
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([status])
-  @@map("billing_subscriptions")
-}
-
-model BillingInvoice {
-  id                String   @id @default(uuid())
-
-  stripeInvoiceId   String   @unique
-  subscriptionId    String?
-  subscription      BillingSubscription? @relation(fields: [subscriptionId], references: [id])
-
-  amountDue         Int
-  amountPaid        Int
-  currency          String   @default("CAD")
-
-  status            BillingInvoiceStatus
-
-  hostedInvoiceUrl  String?
-  invoicePdfUrl     String?
-
-  issuedAt          DateTime
-  paidAt            DateTime?
-
-  createdAt         DateTime @default(now())
-
-  @@index([status])
-  @@map("billing_invoices")
-}
-
-model StripeWebhookEvent {
-  id              String   @id @default(uuid())
-
-  stripeEventId   String   @unique
-  type            String
-
-  processed       Boolean  @default(false)
-  processedAt     DateTime?
-
-  payload         Json
-
-  createdAt       DateTime @default(now())
-
-  @@index([type])
-  @@map("stripe_webhook_events")
-}
-
-model Reel {
-  id          String   @id @default(uuid())
-
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  videoFileId String   @unique
-  video       File     @relation("ReelVideo", fields: [videoFileId], references: [id], onDelete: Restrict)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([businessId])
-  @@index([createdAt, id])
-  @@map("reels")
-}
-
-model AnalyticsEvent {
-  id String @id @default(uuid())
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  viewerUserId String
-  viewer       User @relation(fields: [viewerUserId], references: [id], onDelete: Cascade)
-
-  type AnalyticsEventType
-
-  actionType AnalyticsActionType?
-
-  source AnalyticsSource
-
-  createdAt DateTime @default(now())
-
-  @@index([businessId])
-  @@index([businessId, createdAt])
-  @@index([businessId, type])
-  @@index([businessId, type, createdAt])
-  @@index([businessId, actionType])
-  @@index([businessId, source])
-  @@map("analytics_events")
+enum workflow_execution_status {
+  started
+  in_progress
+  failed
+  succeeded
 }

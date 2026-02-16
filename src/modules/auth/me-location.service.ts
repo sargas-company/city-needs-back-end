@@ -12,6 +12,7 @@ type LocationSelect = Prisma.LocationGetPayload<{
     source: true;
     provider: true;
     placeId: true;
+    formattedAddress: true;
     updatedAt: true;
   };
 }>;
@@ -30,6 +31,7 @@ export class MeLocationService {
         source: dto.source,
         provider: dto.provider ?? null,
         placeId: dto.placeId ?? null,
+        formattedAddress: dto.formattedAddress ?? null,
       },
       update: {
         lat: dto.lat,
@@ -37,6 +39,7 @@ export class MeLocationService {
         source: dto.source,
         provider: dto.provider ?? null,
         placeId: dto.placeId ?? null,
+        formattedAddress: dto.formattedAddress ?? null,
       },
       select: {
         lat: true,
@@ -44,6 +47,7 @@ export class MeLocationService {
         source: true,
         provider: true,
         placeId: true,
+        formattedAddress: true,
         updatedAt: true,
       },
     });
@@ -60,6 +64,7 @@ export class MeLocationService {
         source: true,
         provider: true,
         placeId: true,
+        formattedAddress: true,
         updatedAt: true,
       },
     });
@@ -74,6 +79,7 @@ export class MeLocationService {
       source: location.source,
       provider: location.provider ?? null,
       placeId: location.placeId ?? null,
+      formattedAddress: location.formattedAddress ?? null,
       updatedAt: location.updatedAt.toISOString(),
     };
   }
