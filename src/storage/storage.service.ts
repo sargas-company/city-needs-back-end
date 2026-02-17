@@ -1,7 +1,9 @@
+import { Readable } from 'stream';
+
 export type StorageUploadInput = {
   storageKey: string;
   contentType: string;
-  body: Buffer;
+  body: Buffer | Readable;
   cacheControl?: string;
 };
 
@@ -20,4 +22,5 @@ export abstract class StorageService {
   abstract uploadPrivate(input: StorageUploadInput): Promise<{ storageKey: string }>;
   abstract getSignedDownloadUrl(storageKey: string, expiresInSeconds: number): Promise<string>;
   abstract deleteObject(storageKey: string): Promise<void>;
+  abstract downloadToFile(storageKey: string, destPath: string): Promise<void>;
 }

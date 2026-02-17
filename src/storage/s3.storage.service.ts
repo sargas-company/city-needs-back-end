@@ -1,4 +1,9 @@
 // src/storage/s3.storage.service.ts
+import { createWriteStream } from 'fs';
+import { promises as fs } from 'fs';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -55,8 +60,9 @@ export class S3StorageService extends StorageService {
 
       const publicUrl = `${this.publicBaseUrl}/${encodeURI(input.storageKey)}`;
 
+      const size = Buffer.isBuffer(input.body) ? input.body.length : 'stream';
       this.logger.log(
-        `Uploaded public object: bucket=${this.bucket} key=${input.storageKey} size=${input.body.length}`,
+        `Uploaded public object: bucket=${this.bucket} key=${input.storageKey} size=${size}`,
       );
 
       return { storageKey: input.storageKey, publicUrl };
@@ -88,8 +94,9 @@ export class S3StorageService extends StorageService {
         }),
       );
 
+      const size = Buffer.isBuffer(input.body) ? input.body.length : 'stream';
       this.logger.log(
-        `Uploaded private object: bucket=${this.bucket} key=${input.storageKey} size=${input.body.length}`,
+        `Uploaded private object: bucket=${this.bucket} key=${input.storageKey} size=${size}`,
       );
 
       return { storageKey: input.storageKey };
@@ -143,6 +150,43 @@ export class S3StorageService extends StorageService {
         err?.stack ?? String(err),
       );
       throw new InternalServerErrorException('Failed to delete file');
+    }
+  }
+
+  async downloadToFile(storageKey: string, destPath: string): Promise<void> {
+    this.assertValidKey(storageKey);
+
+    try {
+      const response = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: storageKey,
+        }),
+      );
+
+      if (!response.Body) {
+        throw new Error('Empty response body from S3');
+      }
+
+      const readable =
+        response.Body instanceof Readable
+          ? response.Body
+          : Readable.from(response.Body as AsyncIterable<Uint8Array>);
+
+      await pipeline(readable, createWriteStream(destPath));
+
+      const stats = await fs.stat(destPath);
+      if (stats.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+
+      this.logger.log(`Downloaded object to file: key=${storageKey} dest=${destPath}`);
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to download object: bucket=${this.bucket} key=${storageKey}`,
+        err?.stack ?? String(err),
+      );
+      throw new InternalServerErrorException('Failed to download file');
     }
   }
 

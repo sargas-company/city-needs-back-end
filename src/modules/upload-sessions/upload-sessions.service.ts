@@ -1,10 +1,15 @@
+import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
+import { createReadStream, promises as fs } from 'fs';
+import { unlink } from 'fs/promises';
+import { promisify } from 'util';
 
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,10 +21,14 @@ import { UploadFileDto } from './dto/upload-file.dto';
 import { UploadSessionDto, UploadSessionFileDto } from './dto/upload-session.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
+import { VideoProcessingService } from '../video-processing/video-processing.service';
 
 type DraftSessionLoaded = Prisma.UploadSessionGetPayload<{
   include: { items: { include: { file: true } } };
 }>;
+
+const execFileAsync = promisify(execFile);
+const MAX_VIDEO_DURATION_SECONDS = 60;
 
 @Injectable()
 export class UploadSessionsService {
@@ -28,11 +37,14 @@ export class UploadSessionsService {
   private readonly MAX_LOGO = 1;
   private readonly MAX_PHOTOS = 4;
   private readonly MAX_DOCUMENTS = 4;
+  private readonly MAX_VIDEOS = 1;
   private readonly MAX_FILE_SIZE_MB = 15;
+  private readonly MAX_VIDEO_SIZE_MB = 100;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly videoProcessing: VideoProcessingService,
   ) {}
 
   async getOrCreateDraft(user: User): Promise<UploadSessionDto> {
@@ -94,97 +106,134 @@ export class UploadSessionsService {
 
     this.validateUpload(dto.kind, file);
 
+    if (dto.kind === UploadItemKind.VIDEO) {
+      await this.validateVideoDuration(file.path);
+    }
+
     const counts = this.counts(draft);
 
     if (dto.kind === UploadItemKind.PHOTO && counts.photosCount >= this.MAX_PHOTOS) {
       throw new BadRequestException(`Max ${this.MAX_PHOTOS} photos allowed`);
     }
+
     if (dto.kind === UploadItemKind.DOCUMENT && counts.documentsCount >= this.MAX_DOCUMENTS) {
       throw new BadRequestException(`Max ${this.MAX_DOCUMENTS} documents allowed`);
     }
 
-    // Process images (LOGO and PHOTO) - convert to WebP
-    let processedBuffer = file.buffer;
-    let finalMimeType = file.mimetype;
-    let finalExt = this.guessExt(file.mimetype, file.originalname);
+    // VIDEO: no count check — replacement handled in transaction
 
-    if (dto.kind === UploadItemKind.LOGO || dto.kind === UploadItemKind.PHOTO) {
-      // Prepare buffer for processing
-      let imageBuffer = file.buffer;
+    const objectId = cryptoRandomUuid();
+    const prefix = this.prefixForKind(dto.kind);
+    const finalExt = this.guessExt(file.mimetype, file.originalname);
+    const storageKey = `${prefix}business/${businessId}/${this.kindFolder(
+      dto.kind,
+    )}/${objectId}${finalExt ? `.${finalExt}` : ''}`;
 
-      // Convert HEIC/HEIF to JPEG first (sharp doesn't support them natively)
-      if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
-        try {
+    let uploaded: { storageKey: string; publicUrl: string } | null = null;
+
+    try {
+      // =============================
+      // IMAGE (LOGO / PHOTO)
+      // =============================
+      if (dto.kind === UploadItemKind.LOGO || dto.kind === UploadItemKind.PHOTO) {
+        const fileBuffer = await fs.readFile(file.path);
+        let imageBuffer = fileBuffer;
+
+        if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
           const jpegBuffer = await convert({
-            buffer: file.buffer as unknown as ArrayBufferLike,
+            buffer: fileBuffer as unknown as ArrayBufferLike,
             format: 'JPEG',
             quality: 1,
           });
           imageBuffer = Buffer.from(jpegBuffer);
-        } catch {
-          // heic-convert failed, will attempt to process with sharp directly
-          void 0;
         }
+
+        const resizeSize = dto.kind === UploadItemKind.LOGO ? 1200 : 1600;
+
+        const webpBuffer = await sharp(imageBuffer)
+          .webp({ quality: 85 })
+          .resize(resizeSize, resizeSize, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .toBuffer();
+
+        uploaded = await this.storage.uploadPublic({
+          storageKey,
+          contentType: 'image/webp',
+          body: webpBuffer,
+        });
+      } else {
+        // =============================
+        // VIDEO or DOCUMENT → STREAM
+        // =============================
+        uploaded = await this.storage.uploadPublic({
+          storageKey,
+          contentType: file.mimetype,
+          body: createReadStream(file.path),
+        });
       }
 
-      // Convert image to WebP for universal browser support
-      const resizeSize = dto.kind === UploadItemKind.LOGO ? 1200 : 1600;
-      const webpBuffer = await sharp(imageBuffer)
-        .webp({ quality: 85 })
-        .resize(resizeSize, resizeSize, { fit: 'inside', withoutEnlargement: true })
-        .toBuffer()
-        .catch(() => {
-          throw new BadRequestException(
-            'Unable to process image. Please use JPEG, PNG, WebP, HEIC, or HEIF format.',
-          );
-        });
+      if (!uploaded) {
+        throw new InternalServerErrorException('Upload failed unexpectedly');
+      }
+      const safeUploaded = uploaded;
 
-      processedBuffer = webpBuffer;
-      finalMimeType = 'image/webp';
-      finalExt = 'webp';
-    }
-
-    // Build storageKey
-    const objectId = cryptoRandomUuid();
-    const prefix = this.prefixForKind(dto.kind);
-    const storageKey = `${prefix}business/${businessId}/${this.kindFolder(dto.kind)}/${objectId}${finalExt ? `.${finalExt}` : ''}`;
-
-    // Upload to S3
-    const uploaded = await this.storage.uploadPublic({
-      storageKey,
-      contentType: finalMimeType,
-      body: processedBuffer,
-    });
-
-    try {
-      // DB transaction: create File + item, and if logo replace old logo item/file in draft
+      // =============================
+      // DB TRANSACTION
+      // =============================
       const saved = await this.prisma.$transaction(async (tx) => {
-        // Replace logo if exists
+        // Replace LOGO
         if (dto.kind === UploadItemKind.LOGO) {
           const oldLogoItem = draft.items.find((i) => i.kind === UploadItemKind.LOGO);
           if (oldLogoItem) {
-            // delete DB refs; S3 delete happens after tx
             await tx.uploadSessionItem.delete({ where: { id: oldLogoItem.id } });
             await tx.file.delete({ where: { id: oldLogoItem.fileId } });
 
-            // delete old S3 object after tx
-            setImmediate(() => {
-              const key = oldLogoItem.file.storageKey;
-              if (key)
-                this.storage
-                  .deleteObject(key)
-                  .catch((e) => this.logger.warn(`Failed to delete old logo: ${key} ${String(e)}`));
-            });
+            if (oldLogoItem.file.storageKey) {
+              setImmediate(
+                () =>
+                  void this.storage
+                    .deleteObject(oldLogoItem.file.storageKey!)
+                    .catch((e) =>
+                      this.logger.warn(
+                        `Failed to delete old logo S3: ${oldLogoItem.file.storageKey} ${String(e)}`,
+                      ),
+                    ),
+              );
+            }
+          }
+        }
+
+        // Replace VIDEO (max 1)
+        if (dto.kind === UploadItemKind.VIDEO) {
+          const oldVideoItem = draft.items.find((i) => i.kind === UploadItemKind.VIDEO);
+          if (oldVideoItem) {
+            await tx.uploadSessionItem.delete({ where: { id: oldVideoItem.id } });
+            await tx.file.delete({ where: { id: oldVideoItem.fileId } });
+
+            if (oldVideoItem.file.storageKey) {
+              setImmediate(
+                () =>
+                  void this.storage
+                    .deleteObject(oldVideoItem.file.storageKey!)
+                    .catch((e) =>
+                      this.logger.warn(
+                        `Failed to delete old video S3: ${oldVideoItem.file.storageKey} ${String(e)}`,
+                      ),
+                    ),
+              );
+            }
           }
         }
 
         const createdFile = await tx.file.create({
           data: {
-            url: uploaded.publicUrl,
-            storageKey: uploaded.storageKey,
+            url: safeUploaded.publicUrl,
+            storageKey: safeUploaded.storageKey,
             type: this.fileTypeForKind(dto.kind),
-            mimeType: finalMimeType,
-            sizeBytes: processedBuffer.length,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
             originalName: file.originalname,
             businessId: null,
           },
@@ -198,19 +247,23 @@ export class UploadSessionsService {
           },
         });
 
-        const reloaded = await tx.uploadSession.findUniqueOrThrow({
+        return tx.uploadSession.findUniqueOrThrow({
           where: { id: draft.id },
           include: { items: { include: { file: true } } },
         });
-
-        return reloaded;
       });
 
       return this.toDto(saved);
     } catch (err) {
-      // DB failed -> remove uploaded object to avoid orphan
-      await this.storage.deleteObject(uploaded.storageKey).catch(() => undefined);
+      // If DB fails → cleanup uploaded S3 object
+      if (uploaded?.storageKey) {
+        await this.storage.deleteObject(uploaded.storageKey).catch(() => undefined);
+      }
+
       throw err;
+    } finally {
+      // Always remove temp file
+      await unlink(file.path).catch(() => undefined);
     }
   }
 
@@ -304,9 +357,6 @@ export class UploadSessionsService {
 
   private validateUpload(kind: UploadItemKind, file: Express.Multer.File) {
     const bytes = (mb: number) => mb * 1024 * 1024;
-    if (file.size > bytes(this.MAX_FILE_SIZE_MB)) {
-      throw new BadRequestException(`Max file size is ${this.MAX_FILE_SIZE_MB}MB`);
-    }
 
     const allowedImages = new Set([
       'image/jpeg',
@@ -317,15 +367,30 @@ export class UploadSessionsService {
     ]);
     const allowedDocs = new Set([
       'application/pdf',
-
       'image/jpeg',
       'image/png',
       'image/webp',
-
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
     ]);
+    const allowedVideos = new Set(['video/mp4', 'video/quicktime']);
+
+    if (kind === UploadItemKind.VIDEO) {
+      if (file.size > bytes(this.MAX_VIDEO_SIZE_MB)) {
+        throw new BadRequestException(`Max video file size is ${this.MAX_VIDEO_SIZE_MB}MB`);
+      }
+      if (!allowedVideos.has(file.mimetype)) {
+        throw new BadRequestException(
+          `Invalid mimetype ${file.mimetype} for VIDEO. Allowed: mp4, mov`,
+        );
+      }
+      return;
+    }
+
+    if (file.size > bytes(this.MAX_FILE_SIZE_MB)) {
+      throw new BadRequestException(`Max file size is ${this.MAX_FILE_SIZE_MB}MB`);
+    }
 
     if (kind === UploadItemKind.LOGO || kind === UploadItemKind.PHOTO) {
       if (!allowedImages.has(file.mimetype)) {
@@ -340,13 +405,43 @@ export class UploadSessionsService {
     }
   }
 
+  private async validateVideoDuration(filePath: string): Promise<void> {
+    try {
+      const { stdout } = await execFileAsync('ffprobe', [
+        '-v',
+        'quiet',
+        '-print_format',
+        'json',
+        '-show_format',
+        filePath,
+      ]);
+
+      const data = JSON.parse(stdout);
+      const duration = Number(data.format?.duration);
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        throw new BadRequestException('Unable to read video duration. File may be corrupted.');
+      }
+
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        throw new BadRequestException(
+          `Video duration ${Math.round(duration)}s exceeds max ${MAX_VIDEO_DURATION_SECONDS}s`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Unable to read video file. Ensure it is a valid video.');
+    }
+  }
+
   private counts(session: DraftSessionLoaded) {
     const logoCount = session.items.filter((i) => i.kind === UploadItemKind.LOGO).length;
     const photosCount = session.items.filter((i) => i.kind === UploadItemKind.PHOTO).length;
     const documentsCount = session.items.filter((i) => i.kind === UploadItemKind.DOCUMENT).length;
+    const videosCount = session.items.filter((i) => i.kind === UploadItemKind.VIDEO).length;
     const totalCount = session.items.length;
 
-    return { logoCount, photosCount, documentsCount, totalCount };
+    return { logoCount, photosCount, documentsCount, videosCount, totalCount };
   }
 
   private toDto(session: DraftSessionLoaded): UploadSessionDto {
@@ -369,6 +464,7 @@ export class UploadSessionsService {
       logoCount: c.logoCount,
       photosCount: c.photosCount,
       documentsCount: c.documentsCount,
+      videosCount: c.videosCount,
       totalCount: c.totalCount,
       files,
     };
@@ -382,6 +478,8 @@ export class UploadSessionsService {
         return FileType.BUSINESS_PHOTO;
       case UploadItemKind.DOCUMENT:
         return FileType.BUSINESS_DOCUMENT;
+      case UploadItemKind.VIDEO:
+        return FileType.BUSINESS_VIDEO;
       default:
         return FileType.OTHER;
     }
@@ -396,6 +494,7 @@ export class UploadSessionsService {
   private kindFolder(kind: UploadItemKind) {
     if (kind === UploadItemKind.LOGO) return 'logo';
     if (kind === UploadItemKind.PHOTO) return 'photos';
+    if (kind === UploadItemKind.VIDEO) return 'videos';
     return 'documents';
   }
 
@@ -408,6 +507,8 @@ export class UploadSessionsService {
     if (lower.endsWith('.doc')) return 'doc';
     if (lower.endsWith('.docx')) return 'docx';
     if (lower.endsWith('.txt')) return 'txt';
+    if (lower.endsWith('.mp4')) return 'mp4';
+    if (lower.endsWith('.mov')) return 'mov';
 
     if (mime === 'image/jpeg') return 'jpg';
     if (mime === 'image/png') return 'png';
@@ -417,6 +518,8 @@ export class UploadSessionsService {
     if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
       return 'docx';
     if (mime === 'text/plain') return 'txt';
+    if (mime === 'video/mp4') return 'mp4';
+    if (mime === 'video/quicktime') return 'mov';
 
     return null;
   }
@@ -442,9 +545,16 @@ export class UploadSessionsService {
       throw new BadRequestException(`Max ${this.MAX_PHOTOS} photos allowed`);
     if (c.documentsCount > this.MAX_DOCUMENTS)
       throw new BadRequestException(`Max ${this.MAX_DOCUMENTS} documents allowed`);
+    if (c.videosCount > this.MAX_VIDEOS)
+      throw new BadRequestException(`Max ${this.MAX_VIDEOS} video allowed`);
     if (c.totalCount < 1) throw new BadRequestException('At least one file is required');
 
     const logoItem = draft.items.find((i) => i.kind === UploadItemKind.LOGO) ?? null;
+    const videoItem = draft.items.find((i) => i.kind === UploadItemKind.VIDEO) ?? null;
+
+    // Collect old BusinessVideo S3 keys to delete AFTER transaction
+    const oldVideoS3Keys: string[] = [];
+    let createdVideoId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.uploadSession.update({
@@ -463,9 +573,70 @@ export class UploadSessionsService {
           data: { logoId: logoItem.fileId },
         });
       }
+
+      if (videoItem) {
+        // Cleanup old BusinessVideo if exists
+        const oldVideo = await tx.businessVideo.findUnique({
+          where: { businessId },
+          include: { videoFile: { select: { storageKey: true } } },
+        });
+
+        if (oldVideo) {
+          if (oldVideo.processedUrl) {
+            const key = this.extractStorageKey(oldVideo.processedUrl);
+            if (key) oldVideoS3Keys.push(key);
+          }
+          if (oldVideo.thumbnailUrl) {
+            const key = this.extractStorageKey(oldVideo.thumbnailUrl);
+            if (key) oldVideoS3Keys.push(key);
+          }
+          if (oldVideo.videoFile.storageKey) {
+            oldVideoS3Keys.push(oldVideo.videoFile.storageKey);
+          }
+
+          await tx.businessVideo.delete({ where: { id: oldVideo.id } });
+          await tx.file.delete({ where: { id: oldVideo.videoFileId } });
+        }
+
+        // Create new BusinessVideo
+        const created = await tx.businessVideo.create({
+          data: {
+            businessId,
+            videoFileId: videoItem.fileId,
+            processingStatus: 'UPLOADED',
+          },
+        });
+        createdVideoId = created.id;
+      }
     });
 
+    // After transaction: cleanup old S3 files
+    if (oldVideoS3Keys.length > 0) {
+      await Promise.allSettled(
+        oldVideoS3Keys.map((key) =>
+          this.storage.deleteObject(key).catch((e) => {
+            this.logger.warn(`Failed to delete old video S3 object: ${key} ${String(e)}`);
+          }),
+        ),
+      );
+    }
+
+    // After transaction: enqueue video processing (fire-and-forget so Redis downtime doesn't block the response)
+    if (createdVideoId) {
+      this.videoProcessing.enqueue(createdVideoId).catch((err) => {
+        this.logger.error(
+          `Failed to enqueue video ${createdVideoId}: ${String(err)}. Video stays in UPLOADED.`,
+        );
+      });
+    }
+
     return { committed: true };
+  }
+
+  private extractStorageKey(publicUrl: string): string | null {
+    const idx = publicUrl.indexOf('public/');
+    if (idx === -1) return null;
+    return decodeURI(publicUrl.slice(idx));
   }
 }
 

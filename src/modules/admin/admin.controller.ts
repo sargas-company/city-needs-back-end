@@ -10,20 +10,26 @@ import { successResponse } from 'src/common/utils/response.util';
 import { AdminService } from './admin.service';
 import {
   SwaggerAdminActivateBusiness,
+  SwaggerAdminApproveBusinessVideo,
   SwaggerAdminApproveVerification,
   SwaggerAdminDeactivateBusiness,
   SwaggerAdminGetBusiness,
   SwaggerAdminGetBusinesses,
   SwaggerAdminGetStatisticsSummary,
   SwaggerAdminGetVerifications,
+  SwaggerAdminRejectBusinessVideo,
   SwaggerAdminRejectVerification,
   SwaggerAdminRequestResubmission,
+  SwaggerAdminRequestVideoResubmission,
 } from './admin.swagger';
+import { AdminBusinessVideoActionResponseDto } from './dto/admin-business-video-action-response.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
 import { GetAdminBusinessesQueryDto } from './dto/get-admin-businesses-query.dto';
 import { GetAdminVerificationsQueryDto } from './dto/get-admin-verifications-query.dto';
+import { RejectBusinessVideoDto } from './dto/reject-business-video.dto';
 import { RejectVerificationDto } from './dto/reject-verification.dto';
 import { RequestResubmissionDto } from './dto/request-resubmission.dto';
+import { RequestVideoResubmissionDto } from './dto/request-video-resubmission.dto';
 
 @UseGuards(DbUserAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
@@ -108,5 +114,44 @@ export class AdminController {
   async getStatisticsSummary() {
     const result = await this.adminService.getStatisticsSummary();
     return successResponse(result);
+  }
+
+  @Post('business-videos/:id/approve')
+  @SwaggerAdminApproveBusinessVideo()
+  async approveBusinessVideo(@Param('id') videoId: string, @CurrentUser() user: User) {
+    const result = await this.adminService.approveBusinessVideo(videoId, user.id);
+    return successResponse<AdminBusinessVideoActionResponseDto>(result);
+  }
+
+  @Post('business-videos/:id/reject')
+  @SwaggerAdminRejectBusinessVideo()
+  async rejectBusinessVideo(
+    @Param('id') videoId: string,
+    @Body() dto: RejectBusinessVideoDto,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.adminService.rejectBusinessVideo(
+      videoId,
+      dto.rejectionReason,
+      user.id,
+    );
+
+    return successResponse<AdminBusinessVideoActionResponseDto>(result);
+  }
+
+  @Post('business-videos/:id/resubmission')
+  @SwaggerAdminRequestVideoResubmission()
+  async requestVideoResubmission(
+    @Param('id') videoId: string,
+    @Body() dto: RequestVideoResubmissionDto,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.adminService.requestVideoResubmission(
+      videoId,
+      dto.resubmissionReason,
+      user.id,
+    );
+
+    return successResponse<AdminBusinessVideoActionResponseDto>(result);
   }
 }

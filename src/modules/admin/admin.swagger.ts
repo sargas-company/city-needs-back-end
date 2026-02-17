@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessDetailDto } from './dto/admin-business-detail.dto';
+import { AdminBusinessVideoActionResponseDto } from './dto/admin-business-video-action-response.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationActionResponseDto } from './dto/admin-verification-action-response.dto';
@@ -182,6 +183,69 @@ export function SwaggerAdminRequestResubmission() {
     ApiResponse({
       status: 400,
       description: 'Only PENDING verification can be moved to RESUBMISSION',
+    }),
+  );
+}
+
+export function SwaggerAdminApproveBusinessVideo() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Approve business video (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Business video approved',
+      type: AdminBusinessVideoActionResponseDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Video not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Video is not READY or not PENDING',
+    }),
+  );
+}
+
+export function SwaggerAdminRejectBusinessVideo() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Reject business video (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Business video rejected',
+      type: AdminBusinessVideoActionResponseDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Video not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Video is not READY or not PENDING',
+    }),
+  );
+}
+
+export function SwaggerAdminRequestVideoResubmission() {
+  return applyDecorators(
+    ApiTags('Admin'),
+    ApiBearerAuth(),
+    ApiOperation({ summary: 'Request video resubmission (admin only)' }),
+    ApiResponse({
+      status: 200,
+      description: 'Business video moved to RESUBMISSION',
+      type: AdminBusinessVideoActionResponseDto,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Video not found',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Video is not READY or not PENDING',
     }),
   );
 }

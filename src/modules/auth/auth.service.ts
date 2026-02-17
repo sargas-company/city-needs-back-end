@@ -7,7 +7,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { BusinessStatus, Prisma, User, UserRole, UserStatus } from '@prisma/client';
+import {
+  BusinessStatus,
+  Prisma,
+  User,
+  UserRole,
+  UserStatus,
+  VideoProcessingStatus,
+} from '@prisma/client';
 import * as admin from 'firebase-admin';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -23,6 +30,7 @@ type MeLoadedUser = Prisma.UserGetPayload<{
         logo: true;
         category: true;
         location: true;
+        businessVideo: true;
       };
     };
   };
@@ -50,6 +58,7 @@ export class AuthService {
             logo: true,
             category: true,
             location: true,
+            businessVideo: true,
           },
         },
       },
@@ -128,6 +137,24 @@ export class AuthService {
                 placeId: user.business.location.placeId ?? null,
                 formattedAddress: user.business.location.formattedAddress ?? null,
                 updatedAt: user.business.location.updatedAt.toISOString(),
+              }
+            : null,
+          video: user.business.businessVideo
+            ? {
+                id: user.business.businessVideo.id,
+                processingStatus: user.business.businessVideo.processingStatus,
+                processedUrl:
+                  user.business.businessVideo.processingStatus === VideoProcessingStatus.READY
+                    ? user.business.businessVideo.processedUrl
+                    : null,
+                thumbnailUrl:
+                  user.business.businessVideo.processingStatus === VideoProcessingStatus.READY
+                    ? user.business.businessVideo.thumbnailUrl
+                    : null,
+                durationSeconds: user.business.businessVideo.durationSeconds,
+                width: user.business.businessVideo.width,
+                height: user.business.businessVideo.height,
+                status: user.business.businessVideo.status,
               }
             : null,
         }

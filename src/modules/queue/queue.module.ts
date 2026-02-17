@@ -4,10 +4,10 @@ import { Module } from '@nestjs/common';
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: 'default',
+      name: 'video-processing',
     }),
   ],
   providers: [],
-  exports: [],
+  exports: [BullModule],
 })
 export class QueueModule {}

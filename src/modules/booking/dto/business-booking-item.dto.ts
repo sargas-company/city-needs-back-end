@@ -1,6 +1,7 @@
 // src/modules/booking/dto/business-booking-item.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus } from '@prisma/client';
+
 import { BookingServiceItemDto } from './booking-service-item.dto';
 
 export class UserAvatarDto {

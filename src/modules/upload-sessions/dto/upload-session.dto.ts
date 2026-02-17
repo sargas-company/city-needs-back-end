@@ -19,6 +19,7 @@ export class UploadSessionDto {
   @ApiProperty() logoCount!: number;
   @ApiProperty() photosCount!: number;
   @ApiProperty() documentsCount!: number;
+  @ApiProperty() videosCount!: number;
   @ApiProperty() totalCount!: number;
 
   @ApiProperty({ type: [UploadSessionFileDto] })
