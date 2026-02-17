@@ -210,18 +210,19 @@ model BookingService {
 }
 
 model BusinessVerification {
-  id                 String                     @id @default(uuid())
-  businessId         String
-  status             BusinessVerificationStatus @default(PENDING)
-  verificationFileId String                     @unique
-  submittedAt        DateTime?
-  reviewedAt         DateTime?
-  reviewedByAdminId  String?
-  rejectionReason    String?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  business           Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  verificationFile   File                       @relation("VerificationFile", fields: [verificationFileId], references: [id])
+  id                  String                     @id @default(uuid())
+  businessId          String
+  status              BusinessVerificationStatus @default(PENDING)
+  verificationFileId  String                     @unique
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  reviewedByAdminId   String?
+  rejectionReason     String?
+  resubmissionReason  String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  business            Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  verificationFile    File                       @relation("VerificationFile", fields: [verificationFileId], references: [id])
 
   @@index([businessId, status])
   @@map("business_verifications")

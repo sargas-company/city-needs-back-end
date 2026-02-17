@@ -70,6 +70,7 @@ export class AuthService {
           source: location.source,
           provider: location.provider ?? null,
           placeId: location.placeId ?? null,
+          formattedAddress: location.formattedAddress ?? null,
           updatedAt: location.updatedAt.toISOString(),
         }
       : null;
@@ -125,6 +126,7 @@ export class AuthService {
                 source: user.business.location.source,
                 provider: user.business.location.provider ?? null,
                 placeId: user.business.location.placeId ?? null,
+                formattedAddress: user.business.location.formattedAddress ?? null,
                 updatedAt: user.business.location.updatedAt.toISOString(),
               }
             : null,
