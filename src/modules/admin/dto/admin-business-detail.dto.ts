@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BusinessStatus } from '@prisma/client';
+import { BusinessVideoDto } from 'src/modules/auth/dto/auth-me.dto';
 
 import { AdminBusinessVerificationDto } from './admin-business-verification.dto';
 
@@ -124,4 +125,7 @@ export class AdminBusinessDetailDto {
     type: [AdminBusinessVerificationDto],
   })
   verifications!: AdminBusinessVerificationDto[];
+
+  @ApiProperty({ type: () => BusinessVideoDto, nullable: true })
+  video!: BusinessVideoDto | null;
 }

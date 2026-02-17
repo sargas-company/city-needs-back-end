@@ -109,6 +109,18 @@ export class AdminService {
             username: true,
           },
         },
+        businessVideo: {
+          select: {
+            id: true,
+            processingStatus: true,
+            processedUrl: true,
+            thumbnailUrl: true,
+            durationSeconds: true,
+            width: true,
+            height: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -139,6 +151,7 @@ export class AdminService {
         email: b.owner.email,
         username: b.owner.username,
       },
+      video: b.businessVideo ?? null,
     }));
 
     return {
@@ -218,6 +231,18 @@ export class AdminService {
             },
           },
         },
+        businessVideo: {
+          select: {
+            id: true,
+            processingStatus: true,
+            processedUrl: true,
+            thumbnailUrl: true,
+            durationSeconds: true,
+            width: true,
+            height: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -289,6 +314,7 @@ export class AdminService {
             }
           : null,
       })),
+      video: business.businessVideo ?? null,
     };
   }
 
