@@ -88,12 +88,3 @@ export class BusinessFilesRequestDto {
   payload?: Record<string, never>;
 }
 
-// multipart/Formdata
-
-export class BusinessFilesSkipRequestDto {
-  @ApiProperty({ enum: OnboardingAction, example: OnboardingAction.BUSINESS_FILES_SKIP })
-  action!: OnboardingAction.BUSINESS_FILES_SKIP;
-
-  @ApiPropertyOptional({ default: {} })
-  payload?: Record<string, never>;
-}

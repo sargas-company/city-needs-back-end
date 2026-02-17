@@ -35,7 +35,8 @@ export class UploadSessionsService {
   private readonly logger = new Logger(UploadSessionsService.name);
 
   private readonly MAX_LOGO = 1;
-  private readonly MAX_PHOTOS = 4;
+  private readonly MAX_PHOTOS = 15;
+  private readonly MIN_PHOTOS = 1;
   private readonly MAX_DOCUMENTS = 4;
   private readonly MAX_VIDEOS = 1;
   private readonly MAX_FILE_SIZE_MB = 15;
@@ -539,15 +540,18 @@ export class UploadSessionsService {
 
     const c = this.counts(draft);
 
+    if (c.logoCount < 1)
+      throw new BadRequestException('Logo is required');
     if (c.logoCount > this.MAX_LOGO)
       throw new BadRequestException(`Max ${this.MAX_LOGO} logo allowed`);
+    if (c.photosCount < this.MIN_PHOTOS)
+      throw new BadRequestException(`At least ${this.MIN_PHOTOS} photo is required`);
     if (c.photosCount > this.MAX_PHOTOS)
       throw new BadRequestException(`Max ${this.MAX_PHOTOS} photos allowed`);
     if (c.documentsCount > this.MAX_DOCUMENTS)
       throw new BadRequestException(`Max ${this.MAX_DOCUMENTS} documents allowed`);
     if (c.videosCount > this.MAX_VIDEOS)
       throw new BadRequestException(`Max ${this.MAX_VIDEOS} video allowed`);
-    if (c.totalCount < 1) throw new BadRequestException('At least one file is required');
 
     const logoItem = draft.items.find((i) => i.kind === UploadItemKind.LOGO) ?? null;
     const videoItem = draft.items.find((i) => i.kind === UploadItemKind.VIDEO) ?? null;

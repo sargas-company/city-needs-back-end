@@ -80,8 +80,6 @@ export class OnboardingService {
 
     if (dto.action === OnboardingAction.BUSINESS_FILES) {
       await this.handleBusinessFiles(dbUser);
-    } else if (dto.action === OnboardingAction.BUSINESS_FILES_SKIP) {
-      await this.handleBusinessFilesSkip(dbUser);
     } else {
       await this.prisma.$transaction(async (tx) => {
         switch (dto.action) {
@@ -241,7 +239,7 @@ export class OnboardingService {
           role: user.role,
           currentStep: 3,
           totalSteps,
-          allowedActions: [OnboardingAction.BUSINESS_FILES, OnboardingAction.BUSINESS_FILES_SKIP],
+          allowedActions: [OnboardingAction.BUSINESS_FILES],
           requiredScreen: OnboardingAction.BUSINESS_FILES,
         };
       }
@@ -489,17 +487,6 @@ export class OnboardingService {
       return;
     }
 
-    await this.prisma.user.update({ where: { id: user.id }, data: { onboardingStep: 4 } });
-  }
-
-  private async handleBusinessFilesSkip(user: User) {
-    const business = await this.prisma.business.findUnique({
-      where: { ownerUserId: user.id },
-      select: { id: true },
-    });
-    if (!business) throw new ForbiddenException('Business is required');
-
-    await this.uploadSessions.abortDraft(user);
     await this.prisma.user.update({ where: { id: user.id }, data: { onboardingStep: 4 } });
   }
 

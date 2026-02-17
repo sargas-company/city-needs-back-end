@@ -114,16 +114,6 @@ export class BusinessFilesRequestDto {
   payload?: Record<string, never>;
 }
 
-export class BusinessFilesSkipRequestDto {
-  @ApiProperty({ enum: OnboardingAction, example: OnboardingAction.BUSINESS_FILES_SKIP })
-  action!: OnboardingAction.BUSINESS_FILES_SKIP;
-
-  @ApiPropertyOptional({
-    description: 'Optional JSON string, usually empty',
-    example: '{}',
-  })
-  payload?: Record<string, never>;
-}
 
 export class BusinessVerificationSubmitRequestDto {
   @ApiProperty({

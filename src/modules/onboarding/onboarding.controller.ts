@@ -20,7 +20,6 @@ import {
   BusinessProfilePayloadDto,
   BusinessAddressRequestDto,
   BusinessFilesRequestDto,
-  BusinessFilesSkipRequestDto,
   BusinessProfileRequestDto,
   CustomerAddressRequestDto,
   CustomerCategoriesRequestDto,
@@ -39,7 +38,6 @@ import { OnboardingService } from './onboarding.service';
   BusinessProfileRequestDto,
   BusinessAddressRequestDto,
   BusinessFilesRequestDto,
-  BusinessFilesSkipRequestDto,
   BusinessVerificationSubmitRequestDto,
   AddressPayloadDto,
   CategoriesPayloadDto,
@@ -64,8 +62,7 @@ export class OnboardingController {
       '**BUSINESS_OWNER flow**:\n' +
       '- BUSINESS_PROFILE\n' +
       '- BUSINESS_ADDRESS\n' +
-      '- BUSINESS_FILES (commit upload session)\n' +
-      '- BUSINESS_FILES_SKIP (abort upload session)\n' +
+      '- BUSINESS_FILES (commit upload session, requires logo and at least 1 photo)\n' +
       '- BUSINESS_VERIFICATION_SUBMIT (step 4)\n' +
       '- BUSINESS_VERIFICATION_SKIP (step 4)\n\n' +
       'For BUSINESS_FILES you must upload files first via /onboarding/upload-session.\n' +
@@ -78,7 +75,6 @@ export class OnboardingController {
         { $ref: getSchemaPath(BusinessProfileRequestDto) },
         { $ref: getSchemaPath(BusinessAddressRequestDto) },
         { $ref: getSchemaPath(BusinessFilesRequestDto) },
-        { $ref: getSchemaPath(BusinessFilesSkipRequestDto) },
         { $ref: getSchemaPath(BusinessVerificationSubmitRequestDto) },
         { $ref: getSchemaPath(BusinessVerificationSkipRequestDto) },
       ],
