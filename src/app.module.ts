@@ -1,4 +1,3 @@
-// import { QueueModule } from './modules/queue/queue.module';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullModule } from '@nestjs/bullmq';
@@ -20,8 +19,10 @@ import { BookingModule } from './modules/booking/booking.module';
 import { BusinessModule } from './modules/business/business.module';
 import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { HealthModule } from './modules/health/health.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { QueueModule } from './modules/queue/queue.module';
 import { ReelsPublicModule } from './modules/reels/public/reels-public.module';
 import { ReelsModule } from './modules/reels/reels.module';
 import { ReviewModule } from './modules/review/review.module';
@@ -40,7 +41,12 @@ import { StorageModule } from './storage/storage.module';
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        port: Number(process.env.REDIS_PORT) || 6379,
+      },
+      defaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: true,
+        removeOnFail: false,
       },
     }),
     BullBoardModule.forRoot({
@@ -73,6 +79,8 @@ import { StorageModule } from './storage/storage.module';
     ReelsPublicModule,
     AnalyticsModule,
     AdminModule,
+    QueueModule,
+    HealthModule,
   ],
   providers: [
     LogRetentionService,

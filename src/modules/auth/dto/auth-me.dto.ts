@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { BusinessStatus, FileType } from '@prisma/client';
+import {
+  BusinessStatus,
+  BusinessVideoVerificationStatus,
+  FileType,
+  VideoProcessingStatus,
+} from '@prisma/client';
 
 import { MeLocationDto } from './location/me-location.dto';
 import { UserDto } from './user.dto';
@@ -78,6 +83,32 @@ export class FileDto {
   originalName!: string | null;
 }
 
+export class BusinessVideoDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: VideoProcessingStatus })
+  processingStatus!: VideoProcessingStatus;
+
+  @ApiProperty({ nullable: true })
+  processedUrl!: string | null;
+
+  @ApiProperty({ nullable: true })
+  thumbnailUrl!: string | null;
+
+  @ApiProperty({ nullable: true })
+  durationSeconds!: number | null;
+
+  @ApiProperty({ nullable: true })
+  width!: number | null;
+
+  @ApiProperty({ nullable: true })
+  height!: number | null;
+
+  @ApiProperty({ enum: BusinessVideoVerificationStatus })
+  status!: BusinessVideoVerificationStatus;
+}
+
 export class BusinessDto {
   @ApiProperty()
   id!: string;
@@ -123,6 +154,9 @@ export class BusinessDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   verificationGraceDeadlineAt!: Date | null;
+
+  @ApiProperty({ type: () => BusinessVideoDto, nullable: true })
+  video!: BusinessVideoDto | null;
 }
 
 export class BusinessVerificationGateDto {

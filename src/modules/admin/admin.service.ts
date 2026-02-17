@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BusinessStatus, BusinessVerificationStatus, Prisma } from '@prisma/client';
+import {
+  BusinessStatus,
+  BusinessVerificationStatus,
+  BusinessVideoVerificationStatus,
+  Prisma,
+  VideoProcessingStatus,
+} from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 import { decodeAdminCursor } from './cursor/decode-admin-cursor';
@@ -7,6 +13,7 @@ import { encodeAdminCursor } from './cursor/encode-admin-cursor';
 import { ActivateBusinessResponseDto } from './dto/activate-business-response.dto';
 import { AdminBusinessDetailDto } from './dto/admin-business-detail.dto';
 import { AdminBusinessListItemDto } from './dto/admin-business-list-item.dto';
+import { AdminBusinessVideoActionResponseDto } from './dto/admin-business-video-action-response.dto';
 import { AdminBusinessesResponseDto } from './dto/admin-businesses-response.dto';
 import { AdminStatisticsSummaryDto } from './dto/admin-statistics-summary.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
@@ -970,5 +977,145 @@ export class AdminService {
         businessStatus: verification.business.status,
       };
     });
+  }
+
+  async approveBusinessVideo(
+    videoId: string,
+    adminUserId: string,
+  ): Promise<AdminBusinessVideoActionResponseDto> {
+    const updated = await this.prisma.businessVideo.updateMany({
+      where: {
+        id: videoId,
+        status: BusinessVideoVerificationStatus.PENDING,
+        processingStatus: VideoProcessingStatus.READY,
+      },
+      data: {
+        status: BusinessVideoVerificationStatus.APPROVED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        rejectionReason: null,
+        resubmissionReason: null,
+      },
+    });
+
+    if (updated.count === 0) {
+      const video = await this.prisma.businessVideo.findUnique({
+        where: { id: videoId },
+      });
+
+      if (!video) {
+        throw new NotFoundException('Video not found');
+      }
+
+      if (video.processingStatus !== VideoProcessingStatus.READY) {
+        throw new BadRequestException('Video is not ready for moderation');
+      }
+
+      throw new BadRequestException('Only PENDING video can be approved');
+    }
+
+    const video = await this.prisma.businessVideo.findUniqueOrThrow({
+      where: { id: videoId },
+    });
+
+    return {
+      videoId: video.id,
+      status: BusinessVideoVerificationStatus.APPROVED,
+      businessId: video.businessId,
+    };
+  }
+
+  async rejectBusinessVideo(
+    videoId: string,
+    rejectionReason: string,
+    adminUserId: string,
+  ): Promise<AdminBusinessVideoActionResponseDto> {
+    const updated = await this.prisma.businessVideo.updateMany({
+      where: {
+        id: videoId,
+        status: BusinessVideoVerificationStatus.PENDING,
+        processingStatus: VideoProcessingStatus.READY,
+      },
+      data: {
+        status: BusinessVideoVerificationStatus.REJECTED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        rejectionReason,
+        resubmissionReason: null,
+      },
+    });
+
+    if (updated.count === 0) {
+      const video = await this.prisma.businessVideo.findUnique({
+        where: { id: videoId },
+      });
+
+      if (!video) {
+        throw new NotFoundException('Video not found');
+      }
+
+      if (video.processingStatus !== VideoProcessingStatus.READY) {
+        throw new BadRequestException('Video is not ready for moderation');
+      }
+
+      throw new BadRequestException('Only PENDING video can be rejected');
+    }
+
+    const video = await this.prisma.businessVideo.findUniqueOrThrow({
+      where: { id: videoId },
+    });
+
+    return {
+      videoId: video.id,
+      status: BusinessVideoVerificationStatus.REJECTED,
+      businessId: video.businessId,
+    };
+  }
+
+  async requestVideoResubmission(
+    videoId: string,
+    resubmissionReason: string,
+    adminUserId: string,
+  ): Promise<AdminBusinessVideoActionResponseDto> {
+    const updated = await this.prisma.businessVideo.updateMany({
+      where: {
+        id: videoId,
+        status: BusinessVideoVerificationStatus.PENDING,
+        processingStatus: VideoProcessingStatus.READY,
+      },
+      data: {
+        status: BusinessVideoVerificationStatus.RESUBMISSION,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        resubmissionReason,
+        rejectionReason: null,
+      },
+    });
+
+    if (updated.count === 0) {
+      const video = await this.prisma.businessVideo.findUnique({
+        where: { id: videoId },
+      });
+
+      if (!video) {
+        throw new NotFoundException('Video not found');
+      }
+
+      if (video.processingStatus !== VideoProcessingStatus.READY) {
+        throw new BadRequestException('Video is not ready for moderation');
+      }
+
+      throw new BadRequestException('Only PENDING video can be moved to RESUBMISSION');
+    }
+
+    const video = await this.prisma.businessVideo.findUniqueOrThrow({
+      where: { id: videoId },
+    });
+
+    return {
+      videoId: video.id,
+      status: BusinessVideoVerificationStatus.RESUBMISSION,
+      businessId: video.businessId,
+    };
   }
 }

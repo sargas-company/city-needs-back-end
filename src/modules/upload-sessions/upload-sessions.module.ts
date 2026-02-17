@@ -7,9 +7,10 @@ import { FirebaseModule } from '../../firebase/firebase.module';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { StorageModule } from '../../storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
+import { VideoProcessingModule } from '../video-processing/video-processing.module';
 
 @Module({
-  imports: [StorageModule, FirebaseModule, AuthModule, PrismaModule],
+  imports: [StorageModule, FirebaseModule, AuthModule, PrismaModule, VideoProcessingModule],
   controllers: [UploadSessionsController],
   providers: [UploadSessionsService, DbUserAuthGuard],
   exports: [UploadSessionsService],

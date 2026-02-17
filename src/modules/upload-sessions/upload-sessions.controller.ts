@@ -1,3 +1,5 @@
+import { tmpdir } from 'os';
+
 import {
   Body,
   Controller,
@@ -12,7 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { UploadItemKind, User } from '@prisma/client';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
 import { SkipBusinessVerification } from 'src/common/decorators/skip-business-verification.decorator';
 
 import { UploadFileDto } from './dto/upload-file.dto';
@@ -63,8 +65,13 @@ export class UploadSessionsController {
   })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+      storage: diskStorage({
+        destination: tmpdir(),
+        filename: (_req, file, cb) => {
+          cb(null, `${Date.now()}-${file.originalname}`);
+        },
+      }),
+      limits: { fileSize: 100 * 1024 * 1024, files: 1 },
     }),
   )
   async uploadFile(

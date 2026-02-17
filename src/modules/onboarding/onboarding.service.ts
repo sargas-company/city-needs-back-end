@@ -585,7 +585,7 @@ export class OnboardingService {
             BusinessVerificationStatus.PENDING,
             BusinessVerificationStatus.APPROVED,
             BusinessVerificationStatus.RESUBMISSION,
-          ]
+          ],
         },
       },
       select: { id: true, status: true },

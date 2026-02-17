@@ -34,6 +34,20 @@ enum BusinessVerificationStatus {
   RESUBMISSION
 }
 
+enum BusinessVideoVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RESUBMISSION
+}
+
+enum VideoProcessingStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -48,6 +62,7 @@ enum FileType {
   BUSINESS_DOCUMENT
   BUSINESS_VERIFICATION_DOCUMENT
   REEL_VIDEO
+  BUSINESS_VIDEO
   OTHER
 }
 
@@ -62,6 +77,7 @@ enum UploadItemKind {
   LOGO
   PHOTO
   DOCUMENT
+  VIDEO
 }
 
 enum LocationSource {
@@ -192,6 +208,7 @@ model Business {
   timeZone    String   @default("America/Regina")
   files       File[]   @relation("BusinessFiles")
   reels       Reel[]
+  businessVideo BusinessVideo?
   location Location?
   uploadSessions UploadSession[]
   verifications  BusinessVerification[]
@@ -412,6 +429,7 @@ model File {
   business     Business? @relation("BusinessFiles", fields: [businessId], references: [id], onDelete: Cascade)
   logoBusiness Business? @relation("BusinessLogo")
   userAvatar   User?     @relation("UserAvatar")
+  businessVideo BusinessVideo? @relation("BusinessVideoFile")
   verification BusinessVerification? @relation("VerificationFile")
   sessionItems UploadSessionItem[]
   reel         Reel?    @relation("ReelVideo")
@@ -598,6 +616,33 @@ model Reel {
   @@index([businessId])
   @@index([createdAt, id])
   @@map("reels")
+}
+
+model BusinessVideo {
+  id            String   @id @default(uuid())
+  businessId    String   @unique
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  videoFileId   String   @unique
+  videoFile     File     @relation("BusinessVideoFile", fields: [videoFileId], references: [id], onDelete: Restrict)
+  processingStatus VideoProcessingStatus @default(UPLOADED)
+  processedUrl   String?
+  thumbnailUrl   String?
+  durationSeconds Int?
+  width Int?
+  height Int?
+  status        BusinessVideoVerificationStatus @default(PENDING)
+  submittedAt   DateTime?
+  reviewedAt    DateTime?
+  reviewedByAdminId String?
+  rejectionReason    String?
+  resubmissionReason String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([processingStatus])
+  @@map("business_videos")
 }
 
 model AnalyticsEvent {
