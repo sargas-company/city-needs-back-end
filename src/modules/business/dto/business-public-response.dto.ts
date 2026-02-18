@@ -59,6 +59,32 @@ export class BusinessPublicHourDto {
   is24h!: boolean;
 }
 
+export class BusinessPublicVideoDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ nullable: true })
+  processedUrl!: string | null;
+
+  @ApiProperty({ nullable: true })
+  thumbnailUrl!: string | null;
+
+  @ApiProperty({ nullable: true })
+  durationSeconds!: number | null;
+
+  @ApiProperty({ nullable: true })
+  width!: number | null;
+
+  @ApiProperty({ nullable: true })
+  height!: number | null;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
 export class BusinessPublicPhotoDto {
   @ApiProperty()
   id!: string;
@@ -124,4 +150,7 @@ export class BusinessPublicResponseDto {
 
   @ApiProperty({ type: [BusinessPublicPhotoDto] })
   photos!: BusinessPublicPhotoDto[];
+
+  @ApiProperty({ type: BusinessPublicVideoDto, required: false, nullable: true })
+  video!: BusinessPublicVideoDto | null;
 }

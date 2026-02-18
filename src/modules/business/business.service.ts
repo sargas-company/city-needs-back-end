@@ -12,9 +12,11 @@ import {
   Business,
   BusinessStatus,
   BusinessVerificationStatus,
+  BusinessVideoVerificationStatus,
   FileType,
   Prisma,
   User,
+  VideoProcessingStatus,
 } from '@prisma/client';
 import convert from 'heic-convert';
 import sharp from 'sharp';
@@ -274,6 +276,21 @@ export class BusinessService {
             type: true,
           },
         },
+
+        businessVideo: {
+          select: {
+            id: true,
+            processingStatus: true,
+            status: true,
+            processedUrl: true,
+            thumbnailUrl: true,
+            durationSeconds: true,
+            width: true,
+            height: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
 
@@ -334,6 +351,22 @@ export class BusinessService {
         url: file.url,
         type: file.type,
       })),
+
+      video:
+        business.businessVideo &&
+        business.businessVideo.processingStatus === VideoProcessingStatus.READY &&
+        business.businessVideo.status === BusinessVideoVerificationStatus.APPROVED
+          ? {
+              id: business.businessVideo.id,
+              processedUrl: business.businessVideo.processedUrl,
+              thumbnailUrl: business.businessVideo.thumbnailUrl,
+              durationSeconds: business.businessVideo.durationSeconds,
+              width: business.businessVideo.width,
+              height: business.businessVideo.height,
+              createdAt: business.businessVideo.createdAt,
+              updatedAt: business.businessVideo.updatedAt,
+            }
+          : null,
     };
   }
 
