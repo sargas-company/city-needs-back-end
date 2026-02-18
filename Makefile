@@ -19,6 +19,10 @@ init:
 	@echo "🧼 Resetting database (Prisma migrations)..."
 	npx prisma migrate reset --force
 
+	@echo "🌱 Seeding database..."
+	npx prisma db seed
+
+
 	@echo "✅ Done."
 
 
