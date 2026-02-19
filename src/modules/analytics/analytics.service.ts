@@ -33,7 +33,7 @@ export class AnalyticsService {
         businessId: targetBusinessId,
         viewerUserId,
         type,
-        source,
+        source: source ?? null,
         actionType: actionType ?? null,
       },
     });

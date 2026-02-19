@@ -462,7 +462,7 @@ model AnalyticsEvent {
   viewerUserId String
   type         AnalyticsEventType
   actionType   AnalyticsActionType?
-  source       AnalyticsSource
+  source       AnalyticsSource?
   createdAt    DateTime             @default(now())
   business     Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   viewer       User                 @relation(fields: [viewerUserId], references: [id], onDelete: Cascade)

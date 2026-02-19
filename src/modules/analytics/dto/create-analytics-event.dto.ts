@@ -22,13 +22,14 @@ export class CreateAnalyticsEventDto {
   @Validate(AnalyticsEventValidator)
   type!: AnalyticsEventType;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     enum: AnalyticsSource,
-    description: 'Source of the event',
+    description: 'Required for PROFILE_VIEW, forbidden for USER_ACTION',
     example: AnalyticsSource.SEARCH,
   })
+  @IsOptional()
   @IsEnum(AnalyticsSource)
-  source!: AnalyticsSource;
+  source?: AnalyticsSource;
 
   @ApiPropertyOptional({
     enum: AnalyticsActionType,
