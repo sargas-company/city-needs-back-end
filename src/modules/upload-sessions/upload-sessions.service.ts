@@ -13,7 +13,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { FileType, Prisma, UploadItemKind, UploadSessionStatus, User } from '@prisma/client';
+import {
+  FileType,
+  Prisma,
+  UploadItemKind,
+  UploadSessionStatus,
+  User,
+  VideoProcessingStatus,
+} from '@prisma/client';
 import convert from 'heic-convert';
 import sharp from 'sharp';
 
@@ -540,8 +547,7 @@ export class UploadSessionsService {
 
     const c = this.counts(draft);
 
-    if (c.logoCount < 1)
-      throw new BadRequestException('Logo is required');
+    if (c.logoCount < 1) throw new BadRequestException('Logo is required');
     if (c.logoCount > this.MAX_LOGO)
       throw new BadRequestException(`Max ${this.MAX_LOGO} logo allowed`);
     if (c.photosCount < this.MIN_PHOTOS)
@@ -555,6 +561,24 @@ export class UploadSessionsService {
 
     const logoItem = draft.items.find((i) => i.kind === UploadItemKind.LOGO) ?? null;
     const videoItem = draft.items.find((i) => i.kind === UploadItemKind.VIDEO) ?? null;
+
+    // Block commit if existing video is still being processed
+    if (videoItem) {
+      const existingVideo = await this.prisma.businessVideo.findUnique({
+        where: { businessId },
+        select: { processingStatus: true },
+      });
+
+      if (
+        existingVideo &&
+        existingVideo.processingStatus !== VideoProcessingStatus.READY &&
+        existingVideo.processingStatus !== VideoProcessingStatus.FAILED
+      ) {
+        throw new ConflictException(
+          'Existing video is still being processed. Please wait until it finishes.',
+        );
+      }
+    }
 
     // Collect old BusinessVideo S3 keys to delete AFTER transaction
     const oldVideoS3Keys: string[] = [];

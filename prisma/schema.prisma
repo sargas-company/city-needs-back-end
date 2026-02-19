@@ -419,12 +419,24 @@ model StripeWebhookEvent {
 model Reel {
   id          String   @id @default(uuid())
   businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   videoFileId String   @unique
+  video       File     @relation("ReelVideo", fields: [videoFileId], references: [id])
+  processingStatus VideoProcessingStatus @default(UPLOADED)
+  processedUrl     String?
+  thumbnailUrl     String?
+  durationSeconds  Int?
+  width            Int?
+  height           Int?
+  processingStartedAt  DateTime?
+  processingFinishedAt DateTime?
+  lastError            String?
+  retryCount           Int       @default(0)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  video       File     @relation("ReelVideo", fields: [videoFileId], references: [id])
 
+  @@index([processingStatus])
   @@index([businessId])
   @@index([createdAt, id])
   @@map("reels")
@@ -448,6 +460,11 @@ model BusinessVideo {
   reviewedByAdminId String?
   rejectionReason    String?
   resubmissionReason String?
+  processingStartedAt  DateTime?
+  processingFinishedAt DateTime?
+  lastError            String?
+  retryCount           Int       @default(0)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

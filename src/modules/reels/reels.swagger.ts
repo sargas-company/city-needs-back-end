@@ -106,15 +106,15 @@ export function SwaggerUpsertReel() {
 }
 
 // ============================================================
-// DELETE /business/me/reel
+// DELETE /business/me/reel/:reelId
 // ============================================================
 
 export function SwaggerDeleteMyReel() {
   return applyDecorators(
     ApiOperation({
-      summary: 'Delete current business Reel',
+      summary: 'Delete a specific business Reel by ID',
       description:
-        'Deletes the current Reel. If no Reel exists, the operation succeeds with no effect.',
+        'Deletes a specific Reel by ID. Only allowed when reel status is READY or FAILED.',
     }),
     ApiOkResponse({
       description: 'Reel deleted (or did not exist)',

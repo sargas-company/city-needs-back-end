@@ -1,7 +1,10 @@
+import { tmpdir } from 'os';
+
 import {
   Controller,
   Delete,
   Get,
+  Param,
   Post,
   UploadedFile,
   UseGuards,
@@ -10,7 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
 
 import { ReelsService } from './reels.service';
 import {
@@ -43,8 +46,13 @@ export class ReelsController {
   @SwaggerUpsertReel()
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 30 * 1024 * 1024, files: 1 },
+      storage: diskStorage({
+        destination: tmpdir(),
+        filename: (_req, file, cb) => {
+          cb(null, `${Date.now()}-${file.originalname}`);
+        },
+      }),
+      limits: { fileSize: 100 * 1024 * 1024, files: 1 },
     }),
   )
   async uploadOrReplace(@CurrentUser() user: User, @UploadedFile() file: Express.Multer.File) {
@@ -52,10 +60,10 @@ export class ReelsController {
     return successResponse({ reel }, 201);
   }
 
-  @Delete()
+  @Delete(':reelId')
   @SwaggerDeleteMyReel()
-  async deleteMyReel(@CurrentUser() user: User) {
-    await this.reelsService.deleteMyReel(user);
+  async deleteMyReel(@CurrentUser() user: User, @Param('reelId') reelId: string) {
+    await this.reelsService.deleteMyReel(user, reelId);
     return successResponse({ deleted: true });
   }
 }

@@ -3,6 +3,7 @@ import { BullBoardModule } from '@bull-board/nestjs';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
+import { ReelProcessingService } from './reel-processing.service';
 import { VideoProcessingProcessor } from './video-processing.processor';
 import { VideoProcessingService } from './video-processing.service';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -20,7 +21,7 @@ import { StorageModule } from '../../storage/storage.module';
       adapter: BullMQAdapter,
     }),
   ],
-  providers: [VideoProcessingService, VideoProcessingProcessor],
-  exports: [VideoProcessingService],
+  providers: [VideoProcessingService, ReelProcessingService, VideoProcessingProcessor],
+  exports: [VideoProcessingService, ReelProcessingService],
 })
 export class VideoProcessingModule {}

@@ -18,8 +18,8 @@ const STUCK_UPLOADED_THRESHOLD_MS = 5 * 60 * 1000;
 const STUCK_PROCESSING_THRESHOLD_MS = 30 * 60 * 1000;
 
 @Injectable()
-export class VideoProcessingService {
-  private readonly logger = new Logger(VideoProcessingService.name);
+export class ReelProcessingService {
+  private readonly logger = new Logger(ReelProcessingService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -32,12 +32,12 @@ export class VideoProcessingService {
   // QUEUE
   // ==========================================
 
-  async enqueue(videoId: string): Promise<void> {
+  async enqueue(reelId: string): Promise<void> {
     await this.queue.add(
       'process',
-      { entity: 'businessVideo' as const, id: videoId },
+      { entity: 'reel' as const, id: reelId },
       {
-        jobId: `businessVideo-${videoId}`,
+        jobId: `reel-${reelId}`,
         attempts: 3,
         backoff: {
           type: 'exponential',
@@ -48,19 +48,19 @@ export class VideoProcessingService {
       },
     );
 
-    this.logger.log(`Video ${videoId} enqueued`);
+    this.logger.log(`Reel ${reelId} enqueued`);
   }
 
   // ==========================================
-  // CRON: recover stuck UPLOADED videos
+  // CRON: recover stuck UPLOADED reels
   // ==========================================
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async recoverStuckUploaded(): Promise<void> {
-    this.logger.debug('recoverStuckUploaded cron tick');
+    this.logger.debug('recoverStuckUploaded (reels) cron tick');
     const threshold = new Date(Date.now() - STUCK_UPLOADED_THRESHOLD_MS);
 
-    const stuck = await this.prisma.businessVideo.findMany({
+    const stuck = await this.prisma.reel.findMany({
       where: {
         processingStatus: VideoProcessingStatus.UPLOADED,
         updatedAt: { lt: threshold },
@@ -72,25 +72,26 @@ export class VideoProcessingService {
 
     if (stuck.length === 0) return;
 
-    this.logger.warn(`Found ${stuck.length} stuck UPLOADED video(s), re-enqueuing`);
+    this.logger.warn(`Found ${stuck.length} stuck UPLOADED reel(s), re-enqueuing`);
 
-    for (const video of stuck) {
-      await this.enqueue(video.id).catch((err) => {
-        this.logger.error(`Failed to re-enqueue video ${video.id}: ${String(err)}`);
+    for (const reel of stuck) {
+      await this.enqueue(reel.id).catch((err) => {
+        this.logger.error(`Failed to re-enqueue reel ${reel.id}: ${String(err)}`);
       });
     }
   }
 
   // ==========================================
-  // CRON: recover stuck PROCESSING videos
+  // CRON: recover stuck PROCESSING reels
   // ==========================================
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async recoverStuckProcessing(): Promise<void> {
-    this.logger.debug('recoverStuckProcessing cron tick');
+    this.logger.debug('recoverStuckProcessing (reels) cron tick');
+
     const threshold = new Date(Date.now() - STUCK_PROCESSING_THRESHOLD_MS);
 
-    const stuck = await this.prisma.businessVideo.findMany({
+    const stuck = await this.prisma.reel.findMany({
       where: {
         processingStatus: VideoProcessingStatus.PROCESSING,
         updatedAt: { lt: threshold },
@@ -102,13 +103,11 @@ export class VideoProcessingService {
 
     if (stuck.length === 0) return;
 
-    this.logger.warn(`Found ${stuck.length} stuck PROCESSING video(s), re-enqueuing`);
+    this.logger.warn(`Found ${stuck.length} stuck PROCESSING reel(s), re-enqueuing`);
 
-    for (const video of stuck) {
-      await this.enqueue(video.id).catch((err) => {
-        this.logger.error(
-          `Failed to re-enqueue stuck processing video ${video.id}: ${String(err)}`,
-        );
+    for (const reel of stuck) {
+      await this.enqueue(reel.id).catch((err) => {
+        this.logger.error(`Failed to re-enqueue stuck processing reel ${reel.id}: ${String(err)}`);
       });
     }
   }
@@ -117,15 +116,15 @@ export class VideoProcessingService {
   // PROCESSING
   // ==========================================
 
-  async processVideo(videoId: string, job: Job): Promise<void> {
-    this.logger.log(`processVideo started for videoId=${videoId}`);
+  async processReel(reelId: string, job: Job): Promise<void> {
+    this.logger.log(`processReel started for reelId=${reelId}`);
 
     // Atomic transition (accept PROCESSING too for stalled job retries)
     const now = new Date();
 
-    const updated = await this.prisma.businessVideo.updateMany({
+    const updated = await this.prisma.reel.updateMany({
       where: {
-        id: videoId,
+        id: reelId,
         processingStatus: {
           in: [VideoProcessingStatus.UPLOADED, VideoProcessingStatus.PROCESSING],
         },
@@ -139,25 +138,25 @@ export class VideoProcessingService {
     });
 
     if (updated.count === 0) {
-      this.logger.warn(`Video ${videoId}: not in UPLOADED or PROCESSING state, skipping`);
+      this.logger.warn(`Reel ${reelId}: not in UPLOADED or PROCESSING state, skipping`);
       return;
     }
 
-    const video = await this.prisma.businessVideo.findUniqueOrThrow({
-      where: { id: videoId },
-      include: { videoFile: true, business: { select: { id: true } } },
+    const reel = await this.prisma.reel.findUniqueOrThrow({
+      where: { id: reelId },
+      include: { video: true, business: { select: { id: true } } },
     });
 
-    const rawStorageKey = video.videoFile.storageKey;
+    const rawStorageKey = reel.video.storageKey;
     if (!rawStorageKey) {
       // Permanent error — no raw file to process, no point retrying
-      throw new PermanentProcessingError(`Video ${videoId}: missing storageKey`);
+      throw new PermanentProcessingError(`Reel ${reelId}: missing storageKey`);
     }
 
     let tempDir: string | null = null;
 
     try {
-      tempDir = await mkdtemp(join(tmpdir(), 'vidproc-'));
+      tempDir = await mkdtemp(join(tmpdir(), 'reelproc-'));
 
       const rawPath = join(tempDir, 'raw.mp4');
       const processedPath = join(tempDir, 'processed.mp4');
@@ -173,28 +172,28 @@ export class VideoProcessingService {
       }
 
       if (originalProbe.duration > MAX_DURATION_SECONDS) {
-        throw new PermanentProcessingError('Video exceeds max duration');
+        throw new PermanentProcessingError('Reel exceeds max duration');
       }
 
-      // 3️⃣ Transcode
+      // 4️⃣ Transcode
       await transcode(rawPath, processedPath);
 
-      // 4️⃣ Thumbnail
+      // 5️⃣ Thumbnail
       const seek = Math.min(1, originalProbe.duration);
       await generateThumbnail(processedPath, thumbnailPath, seek);
 
-      // 5️⃣ Probe processed
+      // 6️⃣ Probe processed
       const processedProbe = await probe(processedPath);
       if (!processedProbe) {
         throw new PermanentProcessingError('Processed probe failed');
       }
 
-      const businessId = video.business.id;
+      const businessId = reel.business.id;
 
-      const processedKey = `public/business/${businessId}/video/${videoId}/processed.mp4`;
-      const thumbnailKey = `public/business/${businessId}/video/${videoId}/thumbnail.jpg`;
+      const processedKey = `public/business/${businessId}/reels/${reelId}/processed.mp4`;
+      const thumbnailKey = `public/business/${businessId}/reels/${reelId}/thumbnail.jpg`;
 
-      // 6️⃣ Upload processed
+      // 7️⃣ Upload processed
       const processedUpload = await this.storage.uploadPublic({
         storageKey: processedKey,
         contentType: 'video/mp4',
@@ -207,9 +206,9 @@ export class VideoProcessingService {
         body: createReadStream(thumbnailPath),
       });
 
-      // 7️⃣ DB update
-      await this.prisma.businessVideo.update({
-        where: { id: videoId },
+      // 8️⃣ DB update
+      await this.prisma.reel.update({
+        where: { id: reelId },
         data: {
           processingStatus: VideoProcessingStatus.READY,
           processedUrl: processedUpload.publicUrl,
@@ -222,16 +221,19 @@ export class VideoProcessingService {
         },
       });
 
-      // 8️⃣ Delete raw
+      // 9️⃣ Delete raw
       await this.storage.deleteObject(rawStorageKey).catch(() => undefined);
 
-      this.logger.log(`Video ${videoId} processed successfully`);
+      // 🔟 Two-phase cleanup: remove old READY reel(s) for the same business
+      await this.cleanupOldReels(reelId, businessId);
+
+      this.logger.log(`Reel ${reelId} processed successfully`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
 
-      await this.prisma.businessVideo
+      await this.prisma.reel
         .update({
-          where: { id: videoId },
+          where: { id: reelId },
           data: {
             lastError: message,
             processingFinishedAt: new Date(),
@@ -239,7 +241,7 @@ export class VideoProcessingService {
         })
         .catch(() => undefined);
 
-      this.logger.error(`Video ${videoId} failed`, message);
+      this.logger.error(`Reel ${reelId} failed`, message);
 
       throw err;
     } finally {
@@ -253,28 +255,106 @@ export class VideoProcessingService {
   // FINAL FAILURE (called by processor after all retries exhausted)
   // ==========================================
 
-  async setFailed(videoId: string): Promise<void> {
-    const video = await this.prisma.businessVideo
+  // ==========================================
+  // FINAL FAILURE (called by processor after all retries exhausted)
+  // ==========================================
+
+  async setFailed(reelId: string): Promise<void> {
+    const reel = await this.prisma.reel
       .findUnique({
-        where: { id: videoId },
-        include: { videoFile: { select: { storageKey: true } } },
+        where: { id: reelId },
+        include: { video: { select: { storageKey: true } } },
       })
       .catch(() => null);
 
-    await this.prisma.businessVideo
+    if (!reel) return;
+
+    // Mark as FAILED (do not delete DB records)
+    await this.prisma.reel
       .update({
-        where: { id: videoId },
+        where: { id: reelId },
         data: {
           processingStatus: VideoProcessingStatus.FAILED,
           processingFinishedAt: new Date(),
         },
       })
-      .catch(() => undefined);
+      .catch((e) => {
+        this.logger.error(`Failed to mark reel ${reelId} as FAILED: ${String(e)}`);
+      });
 
-    if (video?.videoFile.storageKey) {
-      await this.storage.deleteObject(video.videoFile.storageKey).catch(() => undefined);
+    // Cleanup raw file from S3
+    if (reel.video.storageKey) {
+      await this.storage.deleteObject(reel.video.storageKey).catch((e) => {
+        this.logger.warn(`Failed to delete raw S3 object for failed reel ${reelId}: ${String(e)}`);
+      });
     }
 
-    this.logger.warn(`Video ${videoId} marked as FAILED, raw deleted`);
+    this.logger.warn(`Reel ${reelId} marked as FAILED (record preserved), raw deleted`);
+  }
+
+  // ==========================================
+  // TWO-PHASE CLEANUP
+  // ==========================================
+
+  private async cleanupOldReels(currentReelId: string, businessId: string): Promise<void> {
+    const oldReels = await this.prisma.reel.findMany({
+      where: {
+        businessId,
+        id: { not: currentReelId },
+        processingStatus: VideoProcessingStatus.READY,
+      },
+      include: { video: { select: { id: true, storageKey: true } } },
+    });
+
+    if (oldReels.length === 0) return;
+
+    this.logger.log(`Cleaning up ${oldReels.length} old reel(s) for business ${businessId}`);
+
+    // DB cleanup in transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.reel.deleteMany({
+        where: { id: { in: oldReels.map((r) => r.id) } },
+      });
+      await tx.file.deleteMany({
+        where: { id: { in: oldReels.map((r) => r.video.id) } },
+      });
+    });
+
+    // S3 cleanup after transaction (fire-and-forget)
+    for (const old of oldReels) {
+      if (old.video.storageKey) {
+        this.storage
+          .deleteObject(old.video.storageKey)
+          .catch((e) =>
+            this.logger.warn(`Failed to delete old reel raw: ${old.video.storageKey} ${String(e)}`),
+          );
+      }
+      if (old.processedUrl) {
+        const key = this.extractStorageKey(old.processedUrl);
+        if (key) {
+          this.storage
+            .deleteObject(key)
+            .catch((e) =>
+              this.logger.warn(`Failed to delete old reel processed: ${key} ${String(e)}`),
+            );
+        }
+      }
+      if (old.thumbnailUrl) {
+        const key = this.extractStorageKey(old.thumbnailUrl);
+        if (key) {
+          this.storage
+            .deleteObject(key)
+            .catch((e) =>
+              this.logger.warn(`Failed to delete old reel thumbnail: ${key} ${String(e)}`),
+            );
+        }
+      }
+    }
+  }
+
+  private extractStorageKey(publicUrl: string): string | null {
+    const idx = publicUrl.indexOf('public/');
+    if (idx === -1) return null;
+    return decodeURI(publicUrl.slice(idx));
   }
 }
