@@ -221,6 +221,15 @@ export class ReelProcessingService {
         },
       });
 
+      // Update file record to point to processed video (raw will be deleted)
+      await this.prisma.file.update({
+        where: { id: reel.video.id },
+        data: {
+          url: processedUpload.publicUrl,
+          storageKey: processedKey,
+        },
+      });
+
       // 9️⃣ Delete raw
       await this.storage.deleteObject(rawStorageKey).catch(() => undefined);
 
