@@ -91,6 +91,7 @@ export class ReelsPublicService {
       items: items.map((r) => ({
         id: r.id,
         videoUrl: r.video.url,
+        thumbnailUrl: r.thumbnailUrl,
         createdAt: r.createdAt,
         business: {
           id: r.business.id,
