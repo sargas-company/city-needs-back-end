@@ -13,6 +13,7 @@ export function buildServiceSearchSql(
   }
 
   const searchPattern = '%' + search + '%';
+  const hasPriceFilter = priceMin !== undefined || priceMax !== undefined;
 
   return Prisma.sql`
     AND (
@@ -23,14 +24,31 @@ export function buildServiceSearchSql(
         WHERE s."businessId" = ${Prisma.raw(businessAlias)}.id
           AND s.status = 'ACTIVE'
           AND s.name ILIKE ${searchPattern}
-          ${
-            priceMin !== undefined || priceMax !== undefined
-              ? Prisma.sql`
-                  AND s.price BETWEEN ${priceMin ?? 0} AND ${priceMax ?? 1000000}
-                `
-              : Prisma.empty
-          }
       )
     )
+    ${
+      hasPriceFilter
+        ? Prisma.sql`
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM business_services sp
+                WHERE sp."businessId" = ${Prisma.raw(businessAlias)}.id
+                  AND sp.status = 'ACTIVE'
+                  AND sp.price BETWEEN ${priceMin ?? 0} AND ${priceMax ?? 1000000}
+              )
+              OR (
+                NOT EXISTS (
+                  SELECT 1
+                  FROM business_services sp2
+                  WHERE sp2."businessId" = ${Prisma.raw(businessAlias)}.id
+                    AND sp2.status = 'ACTIVE'
+                )
+                AND ${Prisma.raw(businessAlias)}.price BETWEEN ${priceMin ?? 0} AND ${priceMax ?? 1000000}
+              )
+            )
+          `
+        : Prisma.empty
+    }
   `;
 }

@@ -4,6 +4,7 @@ import { SqlBuilderResult } from './types';
 import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-query';
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
+import { buildBusinessPriceFilterSql } from '../fragments/business-price-filter.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
 import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
@@ -76,6 +77,7 @@ export function buildPopularBusinessesSql(
             ? buildAvailabilitySql(query, 'b')
             : buildServiceSearchSql(query, 'b')
         }
+        ${buildBusinessPriceFilterSql(query)}
         ${needsDistance ? Prisma.sql`AND ${distanceSql} <= ${radiusMeters}` : Prisma.empty}
     ) sub
 

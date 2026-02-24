@@ -87,4 +87,3 @@ export class BusinessFilesRequestDto {
   @ApiPropertyOptional({ default: {} })
   payload?: Record<string, never>;
 }
-

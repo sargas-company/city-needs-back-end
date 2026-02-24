@@ -39,13 +39,13 @@ export const BUSINESS_SORT_RULES: Record<BusinessSort, BusinessSortRule> = {
   },
 
   [BusinessSort.PRICE_ASC]: {
-    requiresSearch: true,
+    requiresSearch: false,
     supportsOpenNow: true,
     cursorFields: ['price', 'id'],
   },
 
   [BusinessSort.PRICE_DESC]: {
-    requiresSearch: true,
+    requiresSearch: false,
     supportsOpenNow: true,
     cursorFields: ['price', 'id'],
   },

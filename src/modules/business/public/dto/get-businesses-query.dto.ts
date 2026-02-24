@@ -51,7 +51,7 @@ export class GetBusinessesQueryDto extends CursorPaginationQueryDto {
   city?: City;
 
   // ------------------------------------------------------------
-  // PRICE FILTER (services-based, requires search)
+  // PRICE FILTER (service-based with search, business-based without search)
   // ------------------------------------------------------------
   @ApiPropertyOptional({ example: 50 })
   @IsOptional()

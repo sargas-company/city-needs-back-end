@@ -41,14 +41,6 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
     throw new BadRequestException('Conflicting sorting parameters');
   }
 
-  // bestPrice + topRated already resolved to sort,
-  // but invalid combinations can still arrive via sort
-  if (sort === BusinessSort.PRICE_ASC || sort === BusinessSort.PRICE_DESC) {
-    if (!search) {
-      throw new BadRequestException('PRICE sorting requires search parameter');
-    }
-  }
-
   // =====================================================
   // 2. Required params per sort
   // =====================================================
@@ -88,10 +80,6 @@ export function validateBusinessesQuery(query: NormalizedBusinessesQuery): void 
   // =====================================================
   // 3. Price filters validation
   // =====================================================
-
-  if ((priceMin !== undefined || priceMax !== undefined) && !search) {
-    throw new BadRequestException('priceMin/priceMax require search parameter');
-  }
 
   if (priceMin !== undefined && priceMax !== undefined && priceMin > priceMax) {
     throw new BadRequestException('priceMin cannot be greater than priceMax');

@@ -7,6 +7,7 @@ import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.
 import { buildDistanceSql } from '../fragments/distance.sql';
 import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
+import { buildBusinessPriceFilterSql } from '../fragments/business-price-filter.sql';
 import { buildServiceSearchSql } from '../fragments/service-search.sql';
 
 /**
@@ -84,6 +85,7 @@ export function buildNearbyBusinessesSql(
             ? buildAvailabilitySql(query, 'b')
             : buildServiceSearchSql(query, 'b')
         }
+        ${buildBusinessPriceFilterSql(query)}
         ${radiusCondition}
     ) sub
     ${cursorCondition}

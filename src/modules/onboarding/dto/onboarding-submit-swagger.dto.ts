@@ -114,7 +114,6 @@ export class BusinessFilesRequestDto {
   payload?: Record<string, never>;
 }
 
-
 export class BusinessVerificationSubmitRequestDto {
   @ApiProperty({
     enum: OnboardingAction,

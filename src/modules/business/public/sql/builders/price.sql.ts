@@ -5,6 +5,7 @@ import { BusinessSort } from '../../dto/business-sort.enum';
 import { NormalizedBusinessesQuery } from '../../query/normalize-businesses-query';
 import { buildAvailabilitySql } from '../fragments/availability.sql';
 import { buildBaseBusinessFiltersSql } from '../fragments/base-business-filters.sql';
+import { buildBusinessPriceFilterSql } from '../fragments/business-price-filter.sql';
 import { buildDistanceSql } from '../fragments/distance.sql';
 import { buildIsSavedSql } from '../fragments/is-saved.sql';
 import { buildOpenNowSql } from '../fragments/open-now.sql';
@@ -13,8 +14,14 @@ import { buildServiceSearchSql } from '../fragments/service-search.sql';
 /**
  * PRICE_ASC / PRICE_DESC sorting
  *
- * price = MIN(service.price) | MAX(service.price)
- * deterministic cursor: (price, id)
+ * With search:
+ *   - service-matched businesses come first, sorted by MIN(matched service price)
+ *   - name-matched businesses come second, sorted by business.price
+ *   - deterministic cursor: (hasServiceMatch, price, id)
+ *
+ * Without search:
+ *   - price = business.price (owner-set average price)
+ *   - deterministic cursor: (price, id)
  *
  * distance is returned ONLY when withinKm is used
  */
@@ -22,6 +29,7 @@ export function buildPriceBusinessesSql(
   query: NormalizedBusinessesQuery,
   decodedCursor: {
     values: {
+      hasServiceMatch?: number;
       price: number;
       id: string;
     };
@@ -29,12 +37,12 @@ export function buildPriceBusinessesSql(
 ): SqlBuilderResult<{
   id: string;
   price: number;
+  hasServiceMatch?: number;
   distance?: number;
 }> {
   const { limit, openNow, sort, lat, lng, radiusMeters, userId } = query;
 
   const isAsc = sort === BusinessSort.PRICE_ASC;
-  const priceSelect = Prisma.sql`MIN(s.price)`;
 
   const needsDistance = radiusMeters !== undefined;
   const distanceSql =
@@ -42,52 +50,67 @@ export function buildPriceBusinessesSql(
 
   const { leftJoin: isSavedJoin, selectExpr: isSavedExpr } = buildIsSavedSql(userId, 'b');
 
-  /**
-   * Cursor condition (applied on aggregated result)
-   */
-  const cursorCondition = decodedCursor
-    ? Prisma.sql`
-        WHERE
-          sub.price ${isAsc ? Prisma.sql`>` : Prisma.sql`<`} ${decodedCursor.values.price}
-          OR (
-            sub.price = ${decodedCursor.values.price}
-            AND sub.id < ${decodedCursor.values.id}
-          )
-      `
-    : Prisma.empty;
+  const hasSearch = !!query.search;
+
+  const searchPattern = hasSearch ? '%' + query.search + '%' : null;
 
   /**
-   * IMPORTANT:
-   * - aggregation happens in inner query
+   * Cursor condition (applied on outer query)
+   */
+  const cursorCondition = buildPriceCursorCondition(decodedCursor, isAsc, hasSearch);
+
+  const innerSql = hasSearch
+    ? Prisma.sql`
+        SELECT
+          b.id,
+          COALESCE(MIN(s.price), b.price)::int AS price,
+          CASE WHEN COUNT(s.id) > 0 THEN 1 ELSE 0 END AS "hasServiceMatch",
+          ${isSavedExpr} AS "isSaved"
+        FROM businesses b
+        LEFT JOIN business_services s
+          ON s."businessId" = b.id
+          AND s.status = 'ACTIVE'
+          AND s.name ILIKE ${searchPattern}
+        ${isSavedJoin}
+
+        WHERE b.status = 'ACTIVE'
+          ${buildBaseBusinessFiltersSql(query)}
+          ${openNow ? buildOpenNowSql('b') : Prisma.empty}
+          ${
+            query.availabilityDate
+              ? buildAvailabilitySql(query, 'b')
+              : buildServiceSearchSql(query, 'b')
+          }
+
+        GROUP BY b.id, b.price, ${isSavedExpr}
+      `
+    : Prisma.sql`
+        SELECT
+          b.id,
+          b.price,
+          ${isSavedExpr} AS "isSaved"
+        FROM businesses b
+        ${isSavedJoin}
+
+        WHERE b.status = 'ACTIVE'
+          ${buildBaseBusinessFiltersSql(query)}
+          ${openNow ? buildOpenNowSql('b') : Prisma.empty}
+          ${buildBusinessPriceFilterSql(query)}
+      `;
+
+  /**
+   * Outer query: shared between both branches
    * - distance is calculated ONLY in outer query
    */
   const sql = Prisma.sql`
     SELECT
       sub.id,
       sub.price
+      ${hasSearch ? Prisma.sql`, sub."hasServiceMatch"` : Prisma.empty}
       ${distanceSql ? Prisma.sql`, ${distanceSql} AS distance` : Prisma.empty},
       sub."isSaved"
     FROM (
-      SELECT
-        b.id,
-        ${priceSelect}::int AS price,
-        ${isSavedExpr} AS "isSaved"
-      FROM businesses b
-      JOIN business_services s
-        ON s."businessId" = b.id
-        AND s.status = 'ACTIVE'
-      ${isSavedJoin}
-
-      WHERE b.status = 'ACTIVE'
-        ${buildBaseBusinessFiltersSql(query)}
-        ${openNow ? buildOpenNowSql('b') : Prisma.empty}
-        ${
-          query.availabilityDate
-            ? buildAvailabilitySql(query, 'b')
-            : buildServiceSearchSql(query, 'b')
-        }
-
-      GROUP BY b.id, ${isSavedExpr}
+      ${innerSql}
     ) sub
     ${distanceSql ? Prisma.sql`JOIN locations l ON l."businessId" = sub.id` : Prisma.empty}
     ${cursorCondition}
@@ -96,6 +119,7 @@ export function buildPriceBusinessesSql(
     }
 
     ORDER BY
+      ${hasSearch ? Prisma.sql`sub."hasServiceMatch" DESC,` : Prisma.empty}
       sub.price ${isAsc ? Prisma.sql`ASC` : Prisma.sql`DESC`},
       sub.id DESC
 
@@ -104,9 +128,68 @@ export function buildPriceBusinessesSql(
 
   return {
     sql,
-    extractCursorValues: (row) => ({
-      price: row.price,
-      id: row.id,
-    }),
+    extractCursorValues: (row): Record<string, number | string> => {
+      if (hasSearch) {
+        return {
+          hasServiceMatch: row.hasServiceMatch ?? 0,
+          price: row.price,
+          id: row.id,
+        };
+      }
+      return {
+        price: row.price,
+        id: row.id,
+      };
+    },
   };
+}
+
+/**
+ * Builds cursor condition for price sorting.
+ *
+ * With search: 3-column cursor (hasServiceMatch DESC, price ASC/DESC, id DESC)
+ * Without search: 2-column cursor (price ASC/DESC, id DESC)
+ */
+function buildPriceCursorCondition(
+  decodedCursor: {
+    values: {
+      hasServiceMatch?: number;
+      price: number;
+      id: string;
+    };
+  } | null,
+  isAsc: boolean,
+  hasSearch: boolean,
+): Prisma.Sql {
+  if (!decodedCursor) return Prisma.empty;
+
+  const { price, id } = decodedCursor.values;
+  const priceOp = isAsc ? Prisma.sql`>` : Prisma.sql`<`;
+
+  if (!hasSearch) {
+    return Prisma.sql`
+      WHERE
+        sub.price ${priceOp} ${price}
+        OR (
+          sub.price = ${price}
+          AND sub.id < ${id}
+        )
+    `;
+  }
+
+  const hsm = decodedCursor.values.hasServiceMatch ?? 1;
+
+  return Prisma.sql`
+    WHERE
+      sub."hasServiceMatch" < ${hsm}
+      OR (
+        sub."hasServiceMatch" = ${hsm}
+        AND sub.price ${priceOp} ${price}
+      )
+      OR (
+        sub."hasServiceMatch" = ${hsm}
+        AND sub.price = ${price}
+        AND sub.id < ${id}
+      )
+  `;
 }
