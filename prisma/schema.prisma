@@ -249,6 +249,8 @@ model Category {
   title                String         @unique
   slug                 String         @unique
   description          String?
+  imageUrl             String?
+  bgColor              String?
   requiresVerification Boolean        @default(false)
   gracePeriodHours     Int?
   businesses           Business[]     @relation("BusinessCategory")

@@ -13,6 +13,12 @@ export class CategoryDto {
   @ApiProperty({ nullable: true })
   description!: string | null;
 
+  @ApiProperty({ nullable: true, description: 'S3 URL for category image' })
+  imageUrl!: string | null;
+
+  @ApiProperty({ nullable: true, description: 'Hex color for card background' })
+  bgColor!: string | null;
+
   @ApiProperty()
   requiresVerification!: boolean;
 
