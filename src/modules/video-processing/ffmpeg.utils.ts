@@ -3,7 +3,7 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
-export const MAX_DURATION_SECONDS = 60;
+export const MAX_DURATION_SECONDS = 20;
 export const FFMPEG_TIMEOUT_MS = 2 * 60 * 1000;
 
 export type ProbeResult = {
