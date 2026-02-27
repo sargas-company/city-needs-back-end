@@ -157,6 +157,12 @@ export class BusinessDto {
 
   @ApiProperty({ type: () => BusinessVideoDto, nullable: true })
   video!: BusinessVideoDto | null;
+
+  @ApiProperty()
+  serviceOnSite!: boolean;
+
+  @ApiProperty()
+  serviceInStudio!: boolean;
 }
 
 export class BusinessVerificationGateDto {

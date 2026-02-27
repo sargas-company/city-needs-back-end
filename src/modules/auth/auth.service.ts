@@ -157,6 +157,8 @@ export class AuthService {
                 status: user.business.businessVideo.status,
               }
             : null,
+          serviceOnSite: user.business.serviceOnSite,
+          serviceInStudio: user.business.serviceInStudio,
         }
       : null;
 
